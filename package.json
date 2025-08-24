@@ -1,6 +1,6 @@
 {
   "name": "contract-rag-manager",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Smart Contract Management System with RAG Framework",
   "author": "RandomWilder",
   "main": "src/main/main.js",
@@ -38,10 +38,12 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": ["x64"]
         }
       ],
-      "artifactName": "${productName}-${version}.${ext}"
+      "artifactName": "${productName}-${version}-mac.${ext}",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
     },
     "nsis": {
       "oneClick": false,
@@ -51,18 +53,8 @@
       "shortcutName": "Contract RAG Manager"
     },
     "dmg": {
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
+      "writeUpdateInfo": false,
+      "format": "UDZO"
     },
     "publish": [
       {
