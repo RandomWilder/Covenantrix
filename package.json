@@ -1,0 +1,61 @@
+{
+  "name": "contract-rag-manager",
+  "version": "1.0.0",
+  "description": "Smart Contract Management System with RAG Framework",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=never",
+    "release": "electron-builder --publish=always"
+  },
+  "build": {
+    "appId": "com.covenantrix.contract-rag-manager",
+    "productName": "Contract RAG Manager",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "publisherName": "Covenantrix",
+      "verifyUpdateCodeSignature": false
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "RandomWilder",
+      "repo": "Covenantrix",
+      "private": false
+    }
+  },
+  "dependencies": {
+    "electron": "^25.3.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.13.3",
+    "electron-updater": "^6.6.2"
+  }
+}
