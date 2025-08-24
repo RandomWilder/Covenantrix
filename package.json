@@ -20,29 +20,58 @@
     },
     "files": [
       "src/**/*",
-      "node_modules/**/*"
+      "!src/**/*.{ts,tsx}",
+      "!src/**/*.map",
+      "!node_modules"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources",
+        "filter": ["**/*"]
+      }
     ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ],
+      "icon": "assets/icon.ico",
       "publisherName": "Covenantrix",
-      "verifyUpdateCodeSignature": false
+      "verifyUpdateCodeSignature": false,
+      "artifactName": "${productName}-${version}-Setup.${ext}"
     },
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
         {
           "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/icon.icns",
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Contract RAG Manager"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
         }
       ]
     },
@@ -57,10 +86,10 @@
     ]
   },
   "dependencies": {
+    "electron-updater": "^6.6.2"
   },
   "devDependencies": {
     "electron": "^25.3.0",
-    "electron-builder": "^24.13.3",
-    "electron-updater": "^6.6.2"
+    "electron-builder": "^24.13.3"
   }
 }

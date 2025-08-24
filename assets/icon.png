@@ -1,0 +1,12 @@
+# Placeholder for app icon
+# You should replace this with actual icon files:
+# - icon.png (256x256 PNG for Linux/development)
+# - icon.ico (Windows icon)
+# - icon.icns (macOS icon)
+
+# For now, the app will use default Electron icon
+# To add proper icons:
+# 1. Create 256x256 PNG icon
+# 2. Convert to ICO for Windows: https://convertio.co/png-ico/
+# 3. Convert to ICNS for macOS: https://convertio.co/png-icns/
+
