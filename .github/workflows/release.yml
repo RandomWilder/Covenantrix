@@ -60,3 +60,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          
+      - name: List built files (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          echo "Contents of dist directory:"
+          ls -la dist/ || echo "No dist directory found"
+          
+      - name: List built files (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "Contents of dist directory:"
+          if (Test-Path "dist") { Get-ChildItem -Path "dist" -Recurse } else { Write-Output "No dist directory found" }
+          
+      - name: Upload artifacts manually (fallback)
+        if: always()
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

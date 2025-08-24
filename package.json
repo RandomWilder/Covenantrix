@@ -1,6 +1,6 @@
 {
   "name": "contract-rag-manager",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "Smart Contract Management System with RAG Framework",
   "author": "RandomWilder",
   "main": "src/main/main.js",
@@ -20,16 +20,7 @@
     },
     "files": [
       "src/**/*",
-      "!src/**/*.{ts,tsx}",
-      "!src/**/*.map",
-      "!node_modules"
-    ],
-    "extraResources": [
-      {
-        "from": "resources",
-        "to": "resources",
-        "filter": ["**/*"]
-      }
+      "package.json"
     ],
     "win": {
       "target": [
@@ -38,7 +29,6 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/icon.ico",
       "publisherName": "Covenantrix",
       "verifyUpdateCodeSignature": false,
       "artifactName": "${productName}-${version}-Setup.${ext}"
@@ -51,7 +41,6 @@
           "arch": ["x64", "arm64"]
         }
       ],
-      "icon": "assets/icon.icns",
       "artifactName": "${productName}-${version}.${ext}"
     },
     "nsis": {
