@@ -10,7 +10,7 @@
     "build": "electron-builder",
     "dist": "electron-builder --publish=never",
     "release": "electron-builder --publish=always",
-    "release:ci": "electron-builder --publish=always --config.forceCodeSigning=false"
+    "release:ci": "electron-builder --publish=onTagOrDraft --config.forceCodeSigning=false"
   },
   "build": {
     "appId": "com.covenantrix.contract-rag-manager",
@@ -46,12 +46,15 @@
         }
       ]
     },
-    "publish": {
-      "provider": "github",
-      "owner": "RandomWilder",
-      "repo": "Covenantrix",
-      "private": false
-    }
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "RandomWilder",
+        "repo": "Covenantrix",
+        "private": false,
+        "releaseType": "release"
+      }
+    ]
   },
   "dependencies": {
   },
