@@ -1,6 +1,6 @@
 {
   "name": "contract-rag-manager",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "AI-Powered Contract Analysis with Conversational RAG Interface",
   "author": "RandomWilder",
   "main": "src/main/main.js",
