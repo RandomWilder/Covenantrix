@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Covenantrix</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -12,7 +13,7 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             color: #333;
@@ -26,32 +27,91 @@
 
         .header {
             background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
             border-radius: 15px;
-            padding: 30px;
+            padding: 20px 30px;
             margin-bottom: 30px;
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 18px;
+            font-family: 'Inter', sans-serif;
         }
 
         .header h1 {
-            font-size: 2.5em;
+            font-size: 24px;
+            font-weight: 600;
+            color: #1a202c;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .settings-btn {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #718096;
+            transition: all 0.2s ease;
+        }
+
+        .settings-btn:hover {
+            background: #edf2f7;
             color: #4a5568;
-            margin-bottom: 10px;
+            transform: translateY(-1px);
         }
 
         .version {
-            background: #667eea;
-            color: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            display: inline-block;
+            background: #f7fafc;
+            color: #718096;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid #e2e8f0;
         }
 
         .main-content {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 400px 1fr;
             gap: 30px;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
         }
 
         .card {
@@ -330,99 +390,181 @@
 
         .user-message, .assistant-message {
             display: flex;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             align-items: flex-start;
         }
 
         .user-message {
-            flex-direction: row-reverse;
+            justify-content: flex-end;
+        }
+
+        .assistant-message {
+            justify-content: flex-start;
         }
 
         .message-avatar {
-            font-size: 1.5em;
-            margin: 0 10px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 0 12px;
             flex-shrink: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .user-message .message-avatar {
+            background: #667eea;
+            color: white;
+            order: 2;
+        }
+
+        .assistant-message .message-avatar {
+            background: #f1f3f5;
+            color: #495057;
+            border: 1px solid #e2e8f0;
         }
 
         .message-content {
-            max-width: 70%;
-            padding: 12px 16px;
-            border-radius: 15px;
+            max-width: 65%;
+            padding: 14px 18px;
+            border-radius: 12px;
             position: relative;
+            font-family: 'Inter', sans-serif;
         }
 
         .user-message .message-content {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #667eea;
             color: white;
-            border-bottom-right-radius: 5px;
+            border-bottom-right-radius: 4px;
         }
 
         .assistant-message .message-content {
-            background: white;
-            border: 1px solid #e0e0e0;
-            border-bottom-left-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-bottom-left-radius: 4px;
+            color: #333;
         }
 
         .message-sources {
-            margin-top: 10px;
-            padding: 8px;
-            background: #f0f4ff;
-            border-radius: 5px;
-            font-size: 0.8em;
-            color: #666;
+            margin-top: 12px;
+            padding: 10px 12px;
+            background: rgba(102, 126, 234, 0.08);
+            border-radius: 8px;
+            font-size: 12px;
+            color: #667eea;
+            border: 1px solid rgba(102, 126, 234, 0.15);
+        }
+
+        .sources-label {
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .source-item {
             display: inline-block;
-            margin: 2px 4px;
-            padding: 2px 8px;
-            background: #e8f4ff;
-            border-radius: 10px;
-            font-size: 0.75em;
+            margin: 3px 6px 3px 0;
+            padding: 4px 10px;
+            background: rgba(102, 126, 234, 0.12);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #5a67d8;
         }
 
         .chat-input-area {
             display: flex;
-            padding: 15px;
-            border-top: 1px solid #e0e0e0;
+            align-items: center;
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+            background: #f8f9fa;
+            gap: 12px;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
             background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 0 16px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
         .chat-input {
             flex: 1;
-            padding: 12px 16px;
-            border: 1px solid #e0e0e0;
-            border-radius: 25px;
-            font-size: 1em;
+            padding: 14px 0;
+            border: none;
+            font-size: 14px;
             outline: none;
-            margin-right: 10px;
+            font-family: 'Inter', sans-serif;
+            color: #333;
         }
 
-        .chat-input:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        .chat-input::placeholder {
+            color: #8e9297;
+        }
+
+        /* Input Field Direction Styles */
+        .chat-input.rtl {
+            direction: rtl;
+            text-align: right;
+        }
+
+        .chat-input.ltr {
+            direction: ltr;
+            text-align: left;
+        }
+
+        .attachment-btn {
+            background: none;
+            border: none;
+            color: #8e9297;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
+            margin-right: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .attachment-btn:hover {
+            background: #f1f3f5;
+            color: #667eea;
         }
 
         .chat-send-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #667eea;
             border: none;
-            border-radius: 50%;
-            width: 45px;
-            height: 45px;
+            border-radius: 10px;
+            width: 44px;
+            height: 44px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.2s ease;
+            transition: all 0.2s ease;
+            color: white;
         }
 
         .chat-send-btn:hover {
-            transform: scale(1.05);
+            background: #5a67d8;
+            transform: translateY(-1px);
         }
 
         .chat-send-btn:disabled {
-            opacity: 0.6;
+            opacity: 0.5;
             cursor: not-allowed;
             transform: none;
         }
@@ -471,20 +613,632 @@
             color: #999;
             margin-top: 5px;
         }
+
+        /* Text Direction Styles */
+        .message-content.rtl {
+            direction: rtl;
+            text-align: right;
+        }
+
+        .message-content.ltr {
+            direction: ltr;
+            text-align: left;
+        }
+
+        /* Override for specific elements that should remain in their natural direction */
+        .message-timestamp {
+            direction: ltr;
+            text-align: inherit;
+        }
+
+        .message-sources {
+            direction: ltr;
+        }
+
+        /* Inline Progress Indicator Styles */
+        .inline-progress {
+            background: #2d2d30;
+            border: 1px solid #444;
+            border-radius: 8px;
+            margin: 12px 16px;
+            padding: 12px 16px;
+            color: #cccccc;
+            font-size: 13px;
+            animation: slideDown 0.3s ease-out;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+                max-height: 0;
+                padding: 0 16px;
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+                max-height: 120px;
+                padding: 12px 16px;
+            }
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .progress-file-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .progress-icon {
+            font-size: 14px;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .progress-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .progress-filename {
+            color: #569CD6;
+            font-weight: 500;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 2px;
+        }
+
+        .progress-message {
+            color: #9CDCFE;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .progress-stats {
+            display: flex;
+            gap: 12px;
+            font-size: 12px;
+            color: #D4D4D4;
+            white-space: nowrap;
+        }
+
+        .progress-percentage {
+            font-weight: 600;
+            color: #4EC9B0;
+        }
+
+        .progress-eta {
+            color: #CE9178;
+        }
+
+        .inline-progress-bar {
+            height: 4px;
+            background: #404040;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .inline-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #569CD6, #4EC9B0);
+            border-radius: 2px;
+            transition: width 0.4s ease-out;
+            animation: progress-glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes progress-glow {
+            0% {
+                box-shadow: 0 0 4px rgba(86, 156, 214, 0.4);
+            }
+            100% {
+                box-shadow: 0 0 8px rgba(86, 156, 214, 0.8);
+            }
+        }
+
+        .progress-substeps {
+            font-size: 11px;
+            color: #808080;
+            line-height: 1.3;
+            margin-top: 4px;
+        }
+
+        /* Settings Modal */
+        .settings-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .settings-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .settings-modal.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 30px 0;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1a202c;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-close {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #718096;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background: #edf2f7;
+            color: #4a5568;
+        }
+
+        .modal-body {
+            padding: 0 30px 30px;
+        }
+
+        /* VS Code Style File Browser */
+        .file-browser {
+            background: #1e1e1e;
+            border-radius: 12px;
+            overflow: hidden;
+            font-family: 'Inter', 'Cascadia Code', 'Consolas', monospace;
+            font-size: 14px;
+            border: 1px solid #333;
+        }
+
+        .file-browser-header {
+            background: #2d2d30;
+            padding: 12px 16px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #cccccc;
+            font-weight: 500;
+        }
+
+        .file-browser-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .file-tree {
+            background: #1e1e1e;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .tree-folder, .tree-file {
+            display: flex;
+            align-items: center;
+            padding: 4px 8px 4px 16px;
+            cursor: pointer;
+            color: #cccccc;
+            user-select: none;
+            transition: background-color 0.1s ease;
+            border-left: 2px solid transparent;
+        }
+
+        .tree-folder:hover, .tree-file:hover {
+            background: #2a2d2e;
+        }
+
+        .tree-folder.active, .tree-file.active {
+            background: #094771;
+            border-left-color: #0e639c;
+        }
+
+        .tree-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .folder-arrow {
+            width: 16px;
+            height: 16px;
+            margin-right: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s ease;
+            color: #cccccc;
+        }
+
+        .folder-arrow.expanded {
+            transform: rotate(90deg);
+        }
+
+        .tree-folder-content {
+            margin-left: 18px;
+            border-left: 1px solid #333;
+            padding-left: 8px;
+        }
+
+        .tree-folder-content.collapsed {
+            display: none;
+        }
+
+        .tree-file {
+            padding-left: 42px;
+        }
+
+        .file-name {
+            flex: 1;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-status {
+            margin-left: auto;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .file-status.ready {
+            background: #1a4a20;
+            color: #4ade80;
+            border: 1px solid #166534;
+        }
+
+        .file-status.processing {
+            background: #7c2d12;
+            color: #fb923c;
+            border: 1px solid #c2410c;
+        }
+
+        .file-status.error {
+            background: #7f1d1d;
+            color: #f87171;
+            border: 1px solid #dc2626;
+        }
+
+        .file-meta {
+            font-size: 11px;
+            color: #888;
+            margin-left: 8px;
+        }
+
+        .file-actions {
+            opacity: 0;
+            transition: opacity 0.1s ease;
+            display: flex;
+            gap: 4px;
+            margin-left: 8px;
+        }
+
+        .tree-file:hover .file-actions {
+            opacity: 1;
+        }
+
+        .file-action-btn {
+            background: transparent;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            padding: 2px;
+            border-radius: 2px;
+            transition: all 0.1s ease;
+        }
+
+        .file-action-btn:hover {
+            background: #333;
+            color: #cccccc;
+        }
+
+        .file-action-btn.delete {
+            color: #f87171;
+        }
+
+        .file-action-btn.delete:hover {
+            background: #7f1d1d;
+            color: #fca5a5;
+        }
+
+        .upload-section {
+            padding: 16px;
+            background: #1e1e1e;
+            border-bottom: 1px solid #333;
+        }
+
+        .upload-drop-zone {
+            border: 2px dashed #555;
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+            color: #888;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            background: #252526;
+        }
+
+        .upload-drop-zone:hover, .upload-drop-zone.dragover {
+            border-color: #0e639c;
+            background: #1a3a4a;
+            color: #cccccc;
+        }
+
+        .upload-btn-compact {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            margin-top: 12px;
+            transition: background-color 0.1s ease;
+        }
+
+        .upload-btn-compact:hover {
+            background: #1177bb;
+        }
+
+        /* Scrollbar styling for file tree */
+        .file-tree::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .file-tree::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        .file-tree::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        .file-tree::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+
+        /* Professional Chat Interface */
+        .chat-header-new {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .chat-header-new h2 {
+            font-size: 20px;
+            margin: 0;
+            color: #333;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .doc-counter {
+            font-size: 13px;
+            color: #667eea;
+            font-weight: 500;
+            padding: 4px 12px;
+            background: #f8f9ff;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📄 Covenantrix</h1>
-            <span class="version">v1.2.0 (Phase 3 - RAG Chat)</span>
+            <div class="header-left">
+                <div class="logo-icon">C</div>
+                <h1>Covenantrix</h1>
+            </div>
+            <div class="header-right">
+                <button class="settings-btn" onclick="openSettingsModal()" title="Settings">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.65-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65A.488.488 0 0 0 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11.5c-.04.32-.07.65-.07.97 0 .33.03.65.07.97L2.46 14.97c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.63Z"/>
+                    </svg>
+                </button>
+                <span class="version">v1.2.8</span>
+            </div>
         </div>
 
         <div class="main-content">
-            <!-- Settings Card -->
-            <div class="settings-card">
-                <h2>⚙️ Settings</h2>
+            <!-- File Browser -->
+            <div class="file-browser">
+                <div class="file-browser-header">
+                    <div class="file-browser-title">
+                        📁 Documents
+                    </div>
+                    <button 
+                        class="file-action-btn delete" 
+                        onclick="deleteAllDocuments()"
+                        id="delete-all-btn"
+                        title="Delete all documents"
+                        style="display: none;">
+                        🗑️
+                    </button>
+                </div>
                 
+                <!-- Inline Progress Indicator -->
+                <div class="inline-progress" id="inline-progress" style="display: none;">
+                    <div class="progress-header">
+                        <div class="progress-file-info">
+                            <span class="progress-icon">🔄</span>
+                            <div class="progress-text">
+                                <div class="progress-filename" id="inline-progress-filename">Processing...</div>
+                                <div class="progress-message" id="inline-progress-message">Initializing...</div>
+                            </div>
+                        </div>
+                        <div class="progress-stats">
+                            <span class="progress-percentage" id="inline-progress-percentage">0%</span>
+                            <span class="progress-eta" id="inline-progress-eta">📈 Estimating...</span>
+                        </div>
+                    </div>
+                    <div class="inline-progress-bar">
+                        <div class="inline-progress-fill" id="inline-progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-substeps" id="inline-progress-substeps"></div>
+                </div>
+                
+                <div class="upload-section">
+                    <div class="upload-drop-zone" id="upload-drop-zone" onclick="selectFiles()">
+                        <div style="font-size: 16px; margin-bottom: 4px;">📄</div>
+                        <div style="font-size: 12px; margin-bottom: 2px;">Drop files here</div>
+                        <div style="font-size: 10px; opacity: 0.7;">PDF, PNG, JPG, TIFF, etc.</div>
+                    </div>
+                    <button class="upload-btn-compact" onclick="selectFiles()">Browse Files</button>
+                </div>
+                
+                <div class="file-tree" id="file-tree">
+                    <!-- File tree will be populated here -->
+                </div>
+            </div>
+
+            <!-- Chat Interface Card -->
+            <div class="card">
+                <div class="chat-header-new">
+                    <h2>Analysis Chat</h2>
+                    <span class="doc-counter" id="doc-counter">⚡ 0 docs ready</span>
+                </div>
+                
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="welcome-message">
+                            <div class="assistant-message">
+                                <div class="message-avatar">AI</div>
+                                <div class="message-content">
+                                    <p>Ready to analyze your contracts. I can help you understand legal documents through natural conversation.</p>
+                                    <p>Try asking:</p>
+                                    <ul style="margin: 8px 0; padding-left: 18px;">
+                                        <li>Who are the parties in this agreement?</li>
+                                        <li>What are the payment terms?</li>
+                                        <li>When does this contract expire?</li>
+                                        <li>What are the termination conditions?</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div class="chat-input-area">
+                        <div class="input-wrapper">
+                            <button class="attachment-btn" title="Attach context">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.31 2.69 6 6 6s6-2.69 6-6V6h-2.5z"/>
+                                </svg>
+                            </button>
+                            <input 
+                                type="text" 
+                                id="chat-input"
+                                class="chat-input" 
+                                placeholder="Ask questions about your contracts..."
+                                onkeypress="handleChatEnter(event)"
+                            >
+                        </div>
+                        <button class="chat-send-btn" id="send-btn" onclick="sendMessage()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="chat-controls">
+                    <button class="btn-small" onclick="startNewConversation()">New Chat</button>
+                    <button class="btn-small" onclick="clearChatHistory()">Clear History</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Settings Modal -->
+    <div class="settings-modal" id="settings-modal" onclick="closeModalOnBackdrop(event)">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">⚙️ Settings</h2>
+                <button class="modal-close" onclick="closeSettingsModal()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" id="settings-content">
                 <h3 style="margin-bottom: 10px;">🔑 OpenAI API Key</h3>
                 <input 
                     type="password" 
@@ -515,7 +1269,11 @@
                         </div>
                         <div id="google-vision-status" style="font-size: 0.9em; margin-bottom: 10px;"></div>
                         
-
+                        <!-- OCR Connection Test -->
+                        <div style="margin-bottom: 15px;">
+                            <button class="btn-small" onclick="testOCRConnection()" id="test-ocr-btn">🔍 Test OCR Connection</button>
+                            <div id="ocr-test-status" style="font-size: 0.9em; margin-top: 5px;"></div>
+                        </div>
                     </div>
                     
                     <div style="margin-bottom: 15px;">
@@ -524,7 +1282,6 @@
                             <input type="checkbox" id="enable-fallback" checked onchange="updateOCRSettings()">
                             <label for="enable-fallback" style="font-size: 0.9em;">Enable automatic fallback between engines</label>
                         </div>
-
                     </div>
                 </div>
                 
@@ -547,79 +1304,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Upload Card -->
-            <div class="card">
-                <h2>📁 Upload Documents</h2>
-                
-                <div class="drag-area" id="drag-area" onclick="selectFiles()">
-                    <div class="drag-text">
-                        <span style="font-size: 2em;">📄</span>
-                        <span>Drag & Drop PDF files or Images here</span>
-                        <span style="font-size: 0.9em; color: #999;">Supports: PDF, PNG, JPG, TIFF, etc.</span>
-                    </div>
-                </div>
-                
-                <button class="btn" onclick="selectFiles()">Browse Files</button>
-                
-                <div id="contracts-list" class="contracts-list hidden">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3>Uploaded Documents</h3>
-                        <button 
-                            class="btn-small btn-danger" 
-                            onclick="deleteAllDocuments()"
-                            id="delete-all-btn"
-                            title="Delete all documents"
-                            style="display: none;">
-                            🗑️ Delete All
-                        </button>
-                    </div>
-                    <div id="contracts"></div>
-                </div>
-            </div>
-
-            <!-- Chat Interface Card -->
-            <div class="card">
-                <h2>💬 Chat with Your Documents</h2>
-                
-                <div class="chat-container">
-                    <div class="chat-messages" id="chat-messages">
-                        <div class="welcome-message">
-                            <div class="assistant-message">
-                                <div class="message-avatar">🤖</div>
-                                <div class="message-content">
-                                    <p>Hello! I'm Covenantrix, your AI contract analyst. I can help you understand your legal documents through natural conversation.</p>
-                                    <p>Ask me anything about your uploaded contracts, such as:</p>
-                                    <ul>
-                                        <li>"Who are the parties in this agreement?"</li>
-                                        <li>"What are the payment terms?"</li>
-                                        <li>"When does this contract expire?"</li>
-                                        <li>"What are the termination conditions?"</li>
-                                    </ul>
-                    </div>
-                    </div>
-                    </div>
-                </div>
-                
-                    <div class="chat-input-area">
-                <input 
-                    type="text" 
-                            id="chat-input"
-                            class="chat-input" 
-                            placeholder="Ask questions about your contracts..."
-                            onkeypress="handleChatEnter(event)"
-                        >
-                        <button class="chat-send-btn" id="send-btn" onclick="sendMessage()">
-                            <span>📤</span>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="chat-controls">
-                    <button class="btn-small" onclick="startNewConversation()">🆕 New Chat</button>
-                    <button class="btn-small" onclick="clearChatHistory()">🗑️ Clear History</button>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -631,11 +1315,38 @@
         let currentConversationId = null;
         let isWaitingForResponse = false;
 
+        // Settings Modal Functions
+        function openSettingsModal() {
+            const modal = document.getElementById('settings-modal');
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden'; // Prevent background scroll
+        }
+
+        function closeSettingsModal() {
+            const modal = document.getElementById('settings-modal');
+            modal.classList.remove('active');
+            document.body.style.overflow = 'auto'; // Restore scroll
+        }
+
+        function closeModalOnBackdrop(event) {
+            if (event.target === event.currentTarget) {
+                closeSettingsModal();
+            }
+        }
+
+        // ESC key to close modal
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeSettingsModal();
+            }
+        });
+
         // Initialize the app
         async function initializeApp() {
             await loadExistingDocuments();
             setupDragAndDrop();
             setupProcessingListener();
+            setupInputDirectionDetection();
             await loadApiKeyStatus();
             await loadOCRSettings();
             await updateStats();
@@ -654,27 +1365,27 @@
 
         // Set up drag and drop functionality
         function setupDragAndDrop() {
-            const dragArea = document.getElementById('drag-area');
+            const dropZone = document.getElementById('upload-drop-zone');
             
-            dragArea.addEventListener('dragenter', (e) => {
+            dropZone.addEventListener('dragenter', (e) => {
                 e.preventDefault();
-                dragArea.classList.add('dragover');
+                dropZone.classList.add('dragover');
             });
             
-            dragArea.addEventListener('dragover', (e) => {
+            dropZone.addEventListener('dragover', (e) => {
                 e.preventDefault();
             });
             
-            dragArea.addEventListener('dragleave', (e) => {
+            dropZone.addEventListener('dragleave', (e) => {
                 e.preventDefault();
-                if (e.target === dragArea) {
-                    dragArea.classList.remove('dragover');
+                if (e.target === dropZone) {
+                    dropZone.classList.remove('dragover');
                 }
             });
             
-            dragArea.addEventListener('drop', (e) => {
+            dropZone.addEventListener('drop', (e) => {
                 e.preventDefault();
-                dragArea.classList.remove('dragover');
+                dropZone.classList.remove('dragover');
                 
                 const files = Array.from(e.dataTransfer.files);
                 const supportedFiles = files.filter(file => isSupportedFile(file));
@@ -688,8 +1399,13 @@
             });
         }
 
+        // Progress tracking variables
+        let progressStartTime = 0;
+        let currentProgressFile = null;
+
         // Set up processing status listener
         function setupProcessingListener() {
+            // Handle legacy processing status events
             window.electronAPI.onProcessingStatus((event, data) => {
                 console.log('Processing status:', data);
                 
@@ -701,11 +1417,105 @@
                     contracts.push(data.result.document);
                     updateContractsList();
                     updateStats(); // Update stats when document is added
+                    hideInlineProgress(); // Hide progress indicator on completion
                 } else if (data.status === 'error') {
                     delete processingFiles[data.fileName];
                     updateProcessingStatus(data.fileName, `Error: ${data.error}`, true);
+                    hideInlineProgress(); // Hide progress indicator on error
                 }
             });
+
+            // Handle detailed progress updates
+            window.electronAPI.onDocumentProgress((event, progressData) => {
+                updateInlineProgress(progressData);
+            });
+        }
+
+        // Show inline progress indicator
+        function showInlineProgress(fileName) {
+            currentProgressFile = fileName;
+            progressStartTime = Date.now();
+            
+            const progressSection = document.getElementById('inline-progress');
+            const filenameEl = document.getElementById('inline-progress-filename');
+            const messageEl = document.getElementById('inline-progress-message');
+            const progressFill = document.getElementById('inline-progress-fill');
+            const percentageEl = document.getElementById('inline-progress-percentage');
+            const etaEl = document.getElementById('inline-progress-eta');
+            const substepsEl = document.getElementById('inline-progress-substeps');
+            
+            // Reset progress elements
+            filenameEl.textContent = fileName;
+            messageEl.textContent = 'Initializing...';
+            progressFill.style.width = '0%';
+            percentageEl.textContent = '0%';
+            etaEl.textContent = '📈 Estimating...';
+            substepsEl.textContent = '';
+            
+            // Show the progress section with animation
+            progressSection.style.display = 'block';
+        }
+
+        // Hide inline progress indicator
+        function hideInlineProgress() {
+            const progressSection = document.getElementById('inline-progress');
+            
+            // Add a subtle fade out before hiding
+            progressSection.style.opacity = '0.5';
+            progressSection.style.transform = 'translateY(-5px)';
+            
+            setTimeout(() => {
+                progressSection.style.display = 'none';
+                progressSection.style.opacity = '1';
+                progressSection.style.transform = 'translateY(0)';
+                currentProgressFile = null;
+            }, 200);
+        }
+
+        // Update inline progress indicator with real-time data
+        function updateInlineProgress(progressData) {
+            if (!currentProgressFile || progressData.fileName !== currentProgressFile) return;
+            
+            const messageEl = document.getElementById('inline-progress-message');
+            const progressFill = document.getElementById('inline-progress-fill');
+            const percentageEl = document.getElementById('inline-progress-percentage');
+            const etaEl = document.getElementById('inline-progress-eta');
+            const substepsEl = document.getElementById('inline-progress-substeps');
+            
+            // Update main progress
+            const progress = Math.min(progressData.progress || 0, 100);
+            progressFill.style.width = `${progress}%`;
+            percentageEl.textContent = `${progress}%`;
+            
+            // Update message
+            if (progressData.message) {
+                messageEl.textContent = progressData.message;
+            }
+            
+            // Update timing and ETA
+            const elapsed = Math.floor((Date.now() - progressStartTime) / 1000);
+            
+            if (progressData.eta && progressData.eta > 0) {
+                etaEl.textContent = `⏱️ ~${progressData.eta}s`;
+            } else if (progress > 0) {
+                const estimatedTotal = (elapsed / progress) * 100;
+                const eta = Math.max(0, Math.round(estimatedTotal - elapsed));
+                etaEl.textContent = eta > 0 ? `⏱️ ~${eta}s` : '⏱️ Almost done';
+            }
+            
+            // Update substeps
+            let substepText = '';
+            if (progressData.stage === 'ocr_active' && progressData.totalPages > 1) {
+                substepText = `OCR Processing: Page ${progressData.currentPage || 1} of ${progressData.totalPages}`;
+            } else if (progressData.chunksProcessed !== undefined) {
+                substepText = `Vectorizing: ${progressData.chunksProcessed} of ${progressData.totalChunks} chunks`;
+            } else if (progressData.documentType) {
+                substepText = `Document type: ${progressData.documentType}`;
+            } else if (progressData.textLength) {
+                substepText = `Extracted ${progressData.textLength.toLocaleString()} characters`;
+            }
+            
+            substepsEl.textContent = substepText;
         }
 
         // File selection
@@ -723,7 +1533,13 @@
 
         // Process selected files
         async function processSelectedFiles(filePaths) {
-            console.log('📄 Processing files:', filePaths);
+            console.log('🔄 Starting to process files:', filePaths);
+            
+            // Show inline progress for the first file
+            if (filePaths.length > 0) {
+                const firstName = filePaths[0].split(/[/\\]/).pop();
+                showInlineProgress(firstName);
+            }
             
             // Add temporary entries for files being processed
             filePaths.forEach(filePath => {
@@ -737,104 +1553,185 @@
                 console.log('✅ All files processed');
             } catch (error) {
                 console.error('Error processing files:', error);
+                hideInlineProgress(); // Hide progress indicator on error
                 alert('Error processing files: ' + error.message);
             }
         }
 
         // Add processing item to UI
         function addProcessingItem(fileName) {
-            const listElement = document.getElementById('contracts-list');
-            const contractsElement = document.getElementById('contracts');
-            
-            listElement.classList.remove('hidden');
-            
-            const processingItem = document.createElement('div');
-            processingItem.className = 'contract-item';
-            processingItem.id = `processing-${fileName}`;
-            processingItem.innerHTML = `
-                <strong>${fileName}</strong>
-                <span class="status processing">Processing...</span>
-                <div style="clear: both; font-size: 0.8em; color: #666; margin-top: 5px;">
-                    ${new Date().toLocaleString()}
-                </div>
-            `;
-            
-            contractsElement.appendChild(processingItem);
+            // Add to processing files object which will be displayed in the tree
+            processingFiles[fileName] = { 
+                fileName, 
+                status: 'processing', 
+                uploadedAt: new Date().toISOString() 
+            };
+            updateFileTree();
         }
 
         // Update processing status
         function updateProcessingStatus(fileName, status, isError) {
-            const processingItem = document.getElementById(`processing-${fileName}`);
-            if (processingItem) {
-                const statusElement = processingItem.querySelector('.status');
-                statusElement.textContent = status;
-                statusElement.className = `status ${isError ? 'error' : 'processing'}`;
-                
+            if (processingFiles[fileName]) {
                 if (isError) {
+                    processingFiles[fileName].error = status;
+                    // Remove processing file after a delay to show error
                     setTimeout(() => {
-                        processingItem.remove();
+                        delete processingFiles[fileName];
+                        updateFileTree();
                     }, 5000);
                 }
+                updateFileTree();
             }
         }
 
-        // Update contracts list
-        function updateContractsList() {
-            const listElement = document.getElementById('contracts-list');
-            const contractsElement = document.getElementById('contracts');
+        // VS Code-style file tree functions
+        let expandedFolders = new Set(['today', 'recent', 'older']);
+
+        function toggleFolder(folderId) {
+            if (expandedFolders.has(folderId)) {
+                expandedFolders.delete(folderId);
+            } else {
+                expandedFolders.add(folderId);
+            }
+            updateFileTree();
+        }
+
+        function groupDocumentsByDate(documents) {
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+
+            const groups = {
+                today: [],
+                recent: [],
+                older: []
+            };
+
+            documents.forEach(doc => {
+                const docDate = new Date(doc.uploadedAt);
+                const docDateOnly = new Date(docDate.getFullYear(), docDate.getMonth(), docDate.getDate());
+                
+                if (docDateOnly.getTime() === today.getTime()) {
+                    groups.today.push(doc);
+                } else if (docDate >= weekAgo) {
+                    groups.recent.push(doc);
+                } else {
+                    groups.older.push(doc);
+                }
+            });
+
+            return groups;
+        }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            switch (ext) {
+                case 'pdf': return '📄';
+                case 'png':
+                case 'jpg':
+                case 'jpeg':
+                case 'gif':
+                case 'bmp':
+                case 'tiff':
+                case 'webp': return '🖼️';
+                default: return '📄';
+            }
+        }
+
+        function getStatusClass(contract) {
+            if (contract.ocrError) return 'error';
+            if (contract.vectorized && contract.chunksCount > 0) return 'ready';
+            return 'processing';
+        }
+
+        function getStatusText(contract) {
+            if (contract.ocrError) return 'ERROR';
+            if (contract.vectorized && contract.chunksCount > 0) return 'READY';
+            return 'PROC';
+        }
+
+        // Update file tree
+        function updateFileTree() {
+            const fileTree = document.getElementById('file-tree');
             const deleteAllBtn = document.getElementById('delete-all-btn');
             
             if (contracts.length > 0) {
-                listElement.classList.remove('hidden');
-                deleteAllBtn.style.display = 'block'; // Show delete all button when there are documents
+                deleteAllBtn.style.display = 'block';
+            } else {
+                deleteAllBtn.style.display = 'none';
+            }
+
+            const groups = groupDocumentsByDate([...contracts, ...Object.values(processingFiles)]);
+            
+            let html = '';
+
+            // Helper function to create folder HTML
+            function createFolder(id, title, count, documents) {
+                if (count === 0) return '';
                 
-                // Remove old contract items (keep processing items)
-                const existingContracts = contractsElement.querySelectorAll('.contract-item:not([id*="processing-"])');
-                existingContracts.forEach(item => item.remove());
+                const isExpanded = expandedFolders.has(id);
+                const arrowClass = isExpanded ? 'expanded' : '';
+                const contentClass = isExpanded ? '' : 'collapsed';
                 
-                // Add contract items
-                contracts.forEach(contract => {
-                    const contractItem = document.createElement('div');
-                    contractItem.className = 'contract-item';
-                    contractItem.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                            <div style="flex: 1;">
-                        <strong>${contract.originalName}</strong>
-                        <span class="status ready">Ready</span>
-                        <div style="clear: both; font-size: 0.8em; color: #666; margin-top: 5px;">
-                            ${new Date(contract.uploadedAt).toLocaleString()} • ${contract.chunksCount} chunks
-                                    ${contract.ocrConfidence !== undefined ? `• OCR: ${Math.round(contract.ocrConfidence)}%` : ''}
-                                    ${contract.ocrEngine ? `• ${contract.ocrEngine === 'google_vision' ? '🚀 Google' : contract.ocrEngine === 'hybrid' ? '🔄 Hybrid' : '🔤 Tesseract'}` : ''}
-                                    ${contract.isScannedPDF ? '• 📄 Scanned PDF' : ''}
-                            ${contract.detectedLanguage ? `• 🌐 ${contract.detectedLanguage}` : ''}
-                                    ${contract.ocrError ? `• ❌ OCR Error` : ''}
-                        </div>
-                        <div style="clear: both; font-size: 0.8em; color: #999; margin-top: 2px;">
-                            ${Math.round(contract.textLength / 1000)}k characters
-                            ${contract.vectorized ? ' • 🧠 Vectorized' : ' • ⚠️ Not vectorized'}
-                            ${contract.hasHebrew ? ' • 🔤 Hebrew' : ''}
-                            ${contract.hasArabic ? ' • 🔤 Arabic' : ''}
+                html += `
+                    <div class="tree-folder" onclick="toggleFolder('${id}')">
+                        <div class="folder-arrow ${arrowClass}">▶</div>
+                        <div class="tree-icon">📁</div>
+                        <span class="file-name">${title} (${count})</span>
+                    </div>
+                    <div class="tree-folder-content ${contentClass}" id="folder-${id}">
+                `;
+
+                documents.forEach(doc => {
+                    const isProcessing = processingFiles[doc.fileName || doc.originalName];
+                    const icon = getFileIcon(doc.originalName || doc.fileName);
+                    const statusClass = isProcessing ? 'processing' : getStatusClass(doc);
+                    const statusText = isProcessing ? 'PROC' : getStatusText(doc);
+                    
+                    html += `
+                        <div class="tree-file" title="${doc.originalName || doc.fileName}">
+                            <div class="tree-icon">${icon}</div>
+                            <span class="file-name">${doc.originalName || doc.fileName}</span>
+                            <span class="file-status ${statusClass}">${statusText}</span>
+                            ${!isProcessing ? `
+                                <div class="file-actions">
+                                    <button class="file-action-btn delete" onclick="deleteDocument('${doc.id}', '${doc.originalName}')" title="Delete">
+                                        ×
+                                    </button>
                                 </div>
-                                ${contract.ocrError ? `
-                                <div style="clear: both; font-size: 0.8em; color: #d32f2f; margin-top: 5px; padding: 5px; background: #ffebee; border-radius: 3px;">
-                                    <strong>⚠️ OCR Processing Failed:</strong> ${contract.ocrError}
-                                </div>
-                                ` : ''}
-                            </div>
-                            <button 
-                                class="btn-small btn-danger" 
-                                onclick="deleteDocument('${contract.id}', '${contract.originalName}')"
-                                title="Delete this document"
-                                style="margin-left: 10px; flex-shrink: 0;">
-                                🗑️ Delete
-                            </button>
+                            ` : ''}
                         </div>
                     `;
-                    contractsElement.appendChild(contractItem);
                 });
-            } else {
-                deleteAllBtn.style.display = 'none'; // Hide delete all button when no documents
+
+                html += '</div>';
             }
+
+            // Create folders
+            createFolder('today', 'Today', groups.today.length, groups.today);
+            createFolder('recent', 'Recent', groups.recent.length, groups.recent);
+            createFolder('older', 'Older', groups.older.length, groups.older);
+
+            // Show empty state if no documents
+            if (contracts.length === 0 && Object.keys(processingFiles).length === 0) {
+                html = `
+                    <div style="padding: 32px; text-align: center; color: #888;">
+                        <div style="font-size: 24px; margin-bottom: 8px;">📄</div>
+                        <div style="font-size: 13px;">No documents uploaded</div>
+                        <div style="font-size: 11px; opacity: 0.7; margin-top: 4px;">Drag & drop files below to get started</div>
+                    </div>
+                `;
+            }
+
+            fileTree.innerHTML = html;
+        }
+
+        // Update contracts list (renamed for compatibility)
+        function updateContractsList() {
+            updateFileTree();
         }
 
         // Chat functionality
@@ -898,13 +1795,14 @@
         function addUserMessage(text) {
             const messagesContainer = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
+            const textDirection = detectTextDirection(text);
             messageDiv.className = 'user-message';
             messageDiv.innerHTML = `
-                <div class="message-avatar">👤</div>
-                <div class="message-content">
+                <div class="message-avatar">You</div>
+                <div class="message-content ${textDirection}">
                     <p>${escapeHtml(text)}</p>
                     <div class="message-timestamp">${new Date().toLocaleTimeString()}</div>
-                            </div>
+                </div>
             `;
             messagesContainer.appendChild(messageDiv);
             scrollToBottom();
@@ -913,29 +1811,30 @@
         function addAssistantMessage(text, sources = [], queryType = 'general') {
             const messagesContainer = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
+            const textDirection = detectTextDirection(text);
             messageDiv.className = 'assistant-message';
             
             let sourcesHtml = '';
             if (sources && sources.length > 0) {
                 sourcesHtml = `
                     <div class="message-sources">
-                        <strong>📋 Sources:</strong><br>
+                        <div class="sources-label">Sources</div>
                         ${sources.map(source => `
                             <span class="source-item">
-                                📄 ${source.document} (${source.matches} matches${source.similarity ? `, ${Math.round(source.similarity * 100)}% similarity` : ''})
+                                ${source.document} (${source.matches} matches${source.similarity ? `, ${Math.round(source.similarity * 100)}%` : ''})
                             </span>
-                            `).join('')}
-                            </div>
+                        `).join('')}
+                    </div>
                 `;
             }
             
             messageDiv.innerHTML = `
-                <div class="message-avatar">🤖</div>
-                <div class="message-content">
+                <div class="message-avatar">AI</div>
+                <div class="message-content ${textDirection}">
                     <p>${formatMessageText(text)}</p>
                     ${sourcesHtml}
                     <div class="message-timestamp">${new Date().toLocaleTimeString()}</div>
-                        </div>
+                </div>
             `;
             messagesContainer.appendChild(messageDiv);
             scrollToBottom();
@@ -946,18 +1845,18 @@
             const typingDiv = document.createElement('div');
             const typingId = 'typing-' + Date.now();
             typingDiv.id = typingId;
-            typingDiv.className = 'typing-indicator';
+            typingDiv.className = 'assistant-message';
             typingDiv.innerHTML = `
-                <div class="message-avatar">🤖</div>
-                <div class="message-content" style="background: white; border: 1px solid #e0e0e0; display: flex; align-items: center;">
-                    <span style="margin-right: 10px;">Thinking</span>
+                <div class="message-avatar">AI</div>
+                <div class="message-content" style="display: flex; align-items: center;">
+                    <span style="margin-right: 10px; font-size: 14px;">Analyzing</span>
                     <div class="typing-dots">
                         <div class="typing-dot"></div>
                         <div class="typing-dot"></div>
                         <div class="typing-dot"></div>
-                            </div>
-                        </div>
-                    `;
+                    </div>
+                </div>
+            `;
             messagesContainer.appendChild(typingDiv);
             scrollToBottom();
             return typingId;
@@ -1020,11 +1919,97 @@
             return div.innerHTML;
         }
 
+        // Text Direction Detection Function
+        function detectTextDirection(text) {
+            if (!text || typeof text !== 'string') {
+                return 'ltr'; // Default to LTR
+            }
+
+            // Remove HTML tags, punctuation, numbers, and extra whitespace for analysis
+            const cleanText = text
+                .replace(/<[^>]*>/g, '') // Remove HTML tags
+                .replace(/[0-9\s\.,;:!?'"()[\]{}\-_+=*/\\|`~@#$%^&<>]/g, '') // Remove non-letter characters
+                .trim();
+
+            if (cleanText.length === 0) {
+                return 'ltr'; // Default to LTR for empty or non-text content
+            }
+
+            // RTL Unicode ranges
+            const rtlRanges = [
+                [0x0590, 0x05FF], // Hebrew
+                [0x0600, 0x06FF], // Arabic
+                [0x0750, 0x077F], // Arabic Supplement
+                [0x08A0, 0x08FF], // Arabic Extended-A
+                [0xFB1D, 0xFB4F], // Hebrew Presentation Forms
+                [0xFB50, 0xFDFF], // Arabic Presentation Forms-A
+                [0xFE70, 0xFEFF], // Arabic Presentation Forms-B
+                [0x10800, 0x10C48], // Cypriot, Imperial Aramaic, etc.
+                [0x1EE00, 0x1EEFF]  // Arabic Mathematical Alphabetic Symbols
+            ];
+
+            let rtlCount = 0;
+            let totalCount = 0;
+
+            // Count RTL vs non-RTL characters
+            for (let i = 0; i < cleanText.length; i++) {
+                const charCode = cleanText.codePointAt(i);
+                if (charCode > 0xFFFF) i++; // Skip next character for surrogate pairs
+
+                // Check if character is in RTL range
+                const isRTL = rtlRanges.some(([start, end]) => charCode >= start && charCode <= end);
+                
+                if (isRTL) {
+                    rtlCount++;
+                }
+                totalCount++;
+            }
+
+            // If more than 30% of characters are RTL, consider the text RTL
+            return (rtlCount / totalCount) > 0.3 ? 'rtl' : 'ltr';
+        }
+
         function handleChatEnter(event) {
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
                 sendMessage();
             }
+        }
+
+        // Real-time input direction detection
+        let inputDirectionTimeout = null;
+        
+        function setupInputDirectionDetection() {
+            const chatInput = document.getElementById('chat-input');
+            if (!chatInput) return;
+            
+            chatInput.addEventListener('input', function(event) {
+                // Clear previous timeout
+                if (inputDirectionTimeout) {
+                    clearTimeout(inputDirectionTimeout);
+                }
+                
+                // Debounce: wait 300ms after user stops typing
+                inputDirectionTimeout = setTimeout(() => {
+                    const inputText = event.target.value.trim();
+                    const direction = detectTextDirection(inputText);
+                    
+                    // Remove existing direction classes
+                    chatInput.classList.remove('rtl', 'ltr');
+                    
+                    // Add detected direction class
+                    if (inputText.length > 0) {
+                        chatInput.classList.add(direction);
+                    }
+                }, 300);
+            });
+            
+            // Clear direction classes when input is cleared
+            chatInput.addEventListener('blur', function() {
+                if (chatInput.value.trim() === '') {
+                    chatInput.classList.remove('rtl', 'ltr');
+                }
+            });
         }
 
         // Document deletion functionality
@@ -1247,6 +2232,53 @@ Type "DELETE ALL" to confirm:`;
             }
         }
 
+        // Test OCR connectivity
+        async function testOCRConnection() {
+            const testBtn = document.getElementById('test-ocr-btn');
+            const statusDiv = document.getElementById('ocr-test-status');
+            
+            // Update UI to show testing state
+            testBtn.disabled = true;
+            testBtn.textContent = '⏳ Testing...';
+            statusDiv.innerHTML = '🔄 Testing OCR connection...';
+            statusDiv.style.color = '#666';
+            
+            try {
+                const result = await window.electronAPI.testOCRConnection();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = `✅ <strong>OCR Connection Successful!</strong><br>
+                        📋 Project: ${result.projectId}<br>
+                        🔧 Engine: ${result.engine}<br>
+                        🌍 Languages: ${result.supportedLanguages.join(', ')}`;
+                    statusDiv.style.color = '#28a745';
+                    
+                    console.log('✅ OCR connection test passed:', result);
+                } else {
+                    statusDiv.innerHTML = `❌ <strong>OCR Connection Failed</strong><br>
+                        ${result.error}<br>
+                        ${result.hasServiceAccount ? 'Service account file detected but connection failed.' : 'No service account file configured.'}`;
+                    statusDiv.style.color = '#dc3545';
+                    
+                    console.error('❌ OCR connection test failed:', result);
+                }
+                
+            } catch (error) {
+                statusDiv.innerHTML = `❌ <strong>Test Error:</strong> ${error.message}`;
+                statusDiv.style.color = '#dc3545';
+                console.error('❌ OCR test error:', error);
+            } finally {
+                // Reset button state
+                testBtn.disabled = false;
+                testBtn.textContent = '🔍 Test OCR Connection';
+                
+                // Clear status after 10 seconds
+                setTimeout(() => {
+                    statusDiv.innerHTML = '';
+                }, 10000);
+            }
+        }
+
         async function updateOCREngine() {
             await updateOCRSettings();
         }
@@ -1349,7 +2381,11 @@ Type "DELETE ALL" to confirm:`;
                 document.getElementById('total-chunks').textContent = vectorStats.total_chunks || 0;
                 document.getElementById('vector-status').textContent = vectorStats.has_openai_key ? '✅' : '❌';
                 
-                // Update language support status
+                // Update document counter in chat header
+                const docCounter = document.getElementById('doc-counter');
+                const readyDocs = documents.filter(doc => doc.vectorized && doc.chunksCount > 0).length;
+                docCounter.textContent = `⚡ ${readyDocs} docs ready`;
+                
                 // Update OCR engine status
                 const ocrEngineStatus = document.getElementById('ocr-engine-status');
                 try {

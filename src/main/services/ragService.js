@@ -4,10 +4,12 @@ const VectorService = require('./vectorService');
 const DocumentService = require('./documentService');
 
 class RAGService {
-  constructor() {
+  constructor(vectorService = null, documentService = null) {
     this.openai = null;
-    this.vectorService = new VectorService();
-    this.documentService = new DocumentService();
+    
+    // Use injected services or create new ones (backward compatibility)
+    this.vectorService = vectorService || new VectorService();
+    this.documentService = documentService || new DocumentService();
     
     // Settings store for configurations
     this.settingsStore = new Store({
@@ -21,7 +23,8 @@ class RAGService {
       encryptionKey: 'covenantrix-conversations-key-v1'
     });
     
-    console.log('🤖 RAGService initialized for conversational contract analysis');
+    const injectionStatus = vectorService && documentService ? '(injected)' : '(self-created)';
+    console.log(`🤖 RAGService initialized for conversational contract analysis ${injectionStatus}`);
   }
 
   async initialize() {

@@ -3,10 +3,14 @@ const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const DocumentService = require('./services/documentService');
 const RAGService = require('./services/ragService');
+const VectorService = require('./services/vectorService');
+const OCRService = require('./services/ocrService');
 
 let mainWindow;
 let documentService;
 let ragService;
+let vectorService;
+let ocrService;
 
 // Configure auto-updater (only in production)
 if (!app.isPackaged) {
@@ -102,12 +106,20 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  // Initialize services
-  documentService = new DocumentService();
-  ragService = new RAGService();
+  console.log('🚀 Initializing services with singleton pattern...');
+  
+  // Initialize services in dependency order (leaf services first)
+  vectorService = new VectorService();
+  ocrService = new OCRService();
+  
+  // Initialize services that depend on leaf services
+  documentService = new DocumentService(vectorService, ocrService);
+  ragService = new RAGService(vectorService, documentService);
   
   // Initialize services
   await ragService.initialize();
+  
+  console.log('✅ All services initialized with shared instances');
   
   setupIPCHandlers();
   createWindow();
@@ -152,20 +164,45 @@ function setupIPCHandlers() {
     return { success: true, filePath: result.filePaths[0] };
   });
 
-  // Process uploaded documents
+  // Process uploaded documents with real-time progress tracking
   ipcMain.handle('process-documents', async (event, filePaths) => {
     const results = [];
     
     for (const filePath of filePaths) {
       const fileName = path.basename(filePath);
       try {
+        // Send initial processing status
         event.sender.send('processing-status', { fileName, status: 'processing' });
-        const result = await documentService.processDocument(filePath, fileName);
+        
+        // Create progress callback for real-time updates
+        const progressCallback = (progressData) => {
+          event.sender.send('document-progress', {
+            fileName,
+            ...progressData
+          });
+        };
+        
+        // Process document with progress tracking
+        const result = await documentService.processDocument(filePath, fileName, progressCallback);
         results.push({ fileName, ...result });
-        event.sender.send('processing-status', { fileName, status: result.success ? 'completed' : 'error', result });
+        
+        // Send final status
+        const finalStatus = result.success ? 'completed' : 'error';
+        event.sender.send('processing-status', { 
+          fileName, 
+          status: finalStatus, 
+          result,
+          processingTime: result.processingTime 
+        });
+        
       } catch (error) {
+        console.error(`Error processing ${fileName}:`, error);
         results.push({ fileName, success: false, error: error.message });
-        event.sender.send('processing-status', { fileName, status: 'error', error: error.message });
+        event.sender.send('processing-status', { 
+          fileName, 
+          status: 'error', 
+          error: error.message 
+        });
       }
     }
     
@@ -215,9 +252,39 @@ function setupIPCHandlers() {
     };
   });
 
-  // Get OCR info (simplified for clean OCR service)
-  ipcMain.handle('get-ocr-info', async () => {
-    return documentService.getOCRInfo();
+
+
+  // Test OCR connectivity
+  ipcMain.handle('test-ocr-connection', async () => {
+    try {
+      const ocrInfo = documentService.getOCRInfo();
+      
+      if (!ocrInfo.isInitialized) {
+        return {
+          success: false,
+          error: 'OCR service not initialized. Please configure Google Vision API.',
+          hasServiceAccount: ocrInfo.hasServiceAccount,
+          projectId: ocrInfo.projectId
+        };
+      }
+
+      // Create a simple test image with text
+      const testResult = await documentService.testOCRConnection();
+      
+      return {
+        success: testResult.success,
+        message: testResult.message,
+        projectId: ocrInfo.projectId,
+        supportedLanguages: ocrInfo.supportedLanguages,
+        engine: 'google_vision',
+        isReady: ocrInfo.isConfigured
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   });
 
   // Check if OCR is ready
@@ -308,12 +375,41 @@ function setupIPCHandlers() {
   });
 
   ipcMain.handle('get-ocr-settings', async () => {
-    return {
-      primaryEngine: 'google_vision',
-      enableFallback: false,
-      isReady: documentService.isOCRReady(),
-      supportedLanguages: ['hebrew', 'arabic', 'english']
-    };
+    try {
+      const ocrInfo = documentService.getOCRInfo();
+      
+      // Store method call results as primitives to ensure serialization
+      const isReady = Boolean(documentService.isOCRReady());
+      const isInitialized = Boolean(ocrInfo.isInitialized);
+      const isConfigured = Boolean(ocrInfo.isConfigured);
+      const hasServiceAccount = Boolean(ocrInfo.hasServiceAccount);
+      const projectId = String(ocrInfo.projectId || 'unknown');
+      
+      // Return only primitive types for safe IPC serialization
+      return {
+        primaryEngine: 'google_vision',
+        enableFallback: false,
+        isReady,
+        supportedLanguages: ['hebrew', 'arabic', 'english'],
+        isInitialized,
+        isConfigured,
+        hasServiceAccount,
+        projectId
+      };
+    } catch (error) {
+      console.error('Error getting OCR settings:', error);
+      return {
+        primaryEngine: 'google_vision',
+        enableFallback: false,
+        isReady: false,
+        supportedLanguages: ['hebrew', 'arabic', 'english'],
+        isInitialized: false,
+        isConfigured: false,
+        hasServiceAccount: false,
+        projectId: 'unknown',
+        error: String(error?.message || 'Unknown error')
+      };
+    }
   });
 
   ipcMain.handle('update-ocr-settings', async (event, settings) => {

@@ -42,14 +42,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setGoogleVisionServiceAccount: (serviceAccountPath) => ipcRenderer.invoke('set-google-vision-service-account', serviceAccountPath),
   getGoogleVisionInfo: () => ipcRenderer.invoke('get-google-vision-info'),
   clearGoogleVisionServiceAccount: () => ipcRenderer.invoke('clear-google-vision-service-account'),
-  getOCRInfo: () => ipcRenderer.invoke('get-ocr-info'),
+
   isOCRReady: () => ipcRenderer.invoke('is-ocr-ready'),
   getOCRSettings: () => ipcRenderer.invoke('get-ocr-settings'),
   updateOCRSettings: (settings) => ipcRenderer.invoke('update-ocr-settings', settings),
+  testOCRConnection: () => ipcRenderer.invoke('test-ocr-connection'),
   getLanguageSupport: () => ipcRenderer.invoke('get-language-support'),
   
-  // Processing status listener
+  // Processing status listeners
   onProcessingStatus: (callback) => ipcRenderer.on('processing-status', callback),
+  onDocumentProgress: (callback) => ipcRenderer.on('document-progress', callback),
   
   // Update operations
   restartApp: () => ipcRenderer.invoke('restart-app'),

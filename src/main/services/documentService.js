@@ -7,7 +7,7 @@ const VectorService = require('./vectorService');
 const OCRService = require('./ocrService');
 
 class DocumentService {
-  constructor() {
+  constructor(vectorService = null, ocrService = null) {
     // Initialize secure storage for documents metadata
     this.store = new Store({
       name: 'documents',
@@ -19,14 +19,15 @@ class DocumentService {
     this.documentsPath = path.join(app.getPath('userData'), 'documents');
     this.ensureDirectoryExists(this.documentsPath);
     
-    // Initialize Phase 2 services
-    this.vectorService = new VectorService();
-    this.ocrService = new OCRService();
+    // Use injected services or create new ones (backward compatibility)
+    this.vectorService = vectorService || new VectorService();
+    this.ocrService = ocrService || new OCRService();
     
     // Initialize vector service
     this.initializeServices();
     
-    console.log('📄 DocumentService initialized with Phase 3 Hybrid OCR capabilities');
+    const injectionStatus = vectorService && ocrService ? '(injected)' : '(self-created)';
+    console.log(`📄 DocumentService initialized with Phase 3 Hybrid OCR capabilities ${injectionStatus}`);
     console.log('📁 Documents stored at:', this.documentsPath);
   }
 
@@ -46,15 +47,68 @@ class DocumentService {
     }
   }
 
-  async processDocument(filePath, fileName) {
+  async processDocument(filePath, fileName, progressCallback = null) {
+    const documentId = uuidv4();
+    console.log(`🔄 Processing document: ${fileName} (ID: ${documentId})`);
+    
+    // Progress tracking setup
+    const startTime = Date.now();
+    const progressSteps = {
+      'initializing': { progress: 5, message: 'Initializing document processing...' },
+      'file_validation': { progress: 10, message: 'Validating file and preparing...' },
+      'text_extraction': { progress: 40, message: 'Extracting text from document...' },
+      'ocr_processing': { progress: 70, message: 'Processing with OCR (this may take a moment)...' },
+      'document_analysis': { progress: 80, message: 'Analyzing document structure...' },
+      'chunking': { progress: 85, message: 'Creating text chunks...' },
+      'saving': { progress: 90, message: 'Saving processed document...' },
+      'vectorizing': { progress: 95, message: 'Adding to semantic search database...' },
+      'completed': { progress: 100, message: 'Document processing completed!' }
+    };
+
+    const reportProgress = (step, additionalInfo = {}) => {
+      if (progressCallback) {
+        const stepInfo = progressSteps[step];
+        const elapsed = Date.now() - startTime;
+        const estimatedTotal = stepInfo.progress > 0 ? (elapsed / stepInfo.progress) * 100 : elapsed * 2;
+        const eta = Math.max(0, estimatedTotal - elapsed);
+        
+        progressCallback({
+          documentId,
+          fileName,
+          step,
+          progress: stepInfo.progress,
+          message: stepInfo.message,
+          elapsed,
+          eta: eta > 1000 ? Math.round(eta / 1000) : 0, // ETA in seconds
+          ...additionalInfo
+        });
+      }
+    };
+
+    reportProgress('initializing');
+    
+    // Handle Hebrew/Unicode filenames by copying to safe ASCII path
+    let workingFilePath = filePath;
+    let tempFilePath = null;
+    
     try {
-      console.log(`🔄 Processing document: ${fileName}`);
-      
-      const documentId = uuidv4();
       const fileExt = path.extname(fileName).toLowerCase();
+      console.log(`📄 File type: ${fileExt}, Size: ${fs.statSync(filePath).size} bytes`);
+      
+      reportProgress('file_validation', { fileSize: fs.statSync(filePath).size });
+
+      // Check if filename contains non-ASCII characters that might cause issues
+      const hasUnicodeChars = /[^\x00-\x7F]/.test(filePath);
+      if (hasUnicodeChars) {
+        console.log(`🔤 Unicode characters detected in file path, creating safe copy...`);
+        tempFilePath = this.createSafeFilePath(filePath, documentId);
+        await this.copyToSafePath(filePath, tempFilePath);
+        workingFilePath = tempFilePath;
+        console.log(`📁 Working with safe file path: ${path.basename(tempFilePath)}`);
+      }
       
       // Read file buffer
-      const buffer = fs.readFileSync(filePath);
+      const buffer = fs.readFileSync(workingFilePath);
       
       let extractedText = '';
       let metadata = {
@@ -63,19 +117,35 @@ class DocumentService {
         fileSize: buffer.length,
         uploadedAt: new Date().toISOString(),
         fileType: fileExt,
-        status: 'processing'
+        status: 'processing',
+        processingSteps: [],
+        hasUnicodeFilename: hasUnicodeChars
       };
 
       // Extract text based on file type
       if (fileExt === '.pdf') {
-        const pdfResult = await this.extractTextFromPDF(buffer, filePath, fileName);
+        console.log(`📄 Starting PDF processing for ${fileName}...`);
+        reportProgress('text_extraction', { stage: 'pdf_analysis' });
+        metadata.processingSteps.push({ step: 'pdf_extraction_started', timestamp: new Date().toISOString() });
+        
+        const pdfResult = await this.extractTextFromPDF(buffer, workingFilePath, fileName, (ocrProgress) => {
+          if (ocrProgress.isOCR) {
+            reportProgress('ocr_processing', { 
+              stage: 'ocr_active',
+              pagesProcessed: ocrProgress.pagesProcessed || 0,
+              totalPages: ocrProgress.totalPages || 1,
+              currentPage: ocrProgress.currentPage || 1
+            });
+          }
+        });
+        metadata.processingSteps.push({ step: 'pdf_extraction_completed', timestamp: new Date().toISOString() });
         
         // Check if the result is an OCR result object or just text
         if (typeof pdfResult === 'object' && pdfResult.text) {
           // This is a scanned PDF that was processed with OCR
-          extractedText = pdfResult.text; // Use raw text for better processing
+          extractedText = pdfResult.text;
           
-          // Store OCR metadata for scanned PDFs
+          // Store comprehensive OCR metadata for scanned PDFs
           metadata.ocrConfidence = pdfResult.confidence;
           metadata.wordCount = pdfResult.wordCount;
           metadata.detectedLanguage = pdfResult.language;
@@ -86,22 +156,49 @@ class DocumentService {
           metadata.pagesProcessed = pdfResult.pagesProcessed;
           metadata.totalPages = pdfResult.totalPages;
           metadata.isScannedPDF = true;
+          metadata.conversionTime = pdfResult.conversionTime;
+          metadata.ocrTime = pdfResult.ocrTime;
+          
+          if (pdfResult.pageResults) {
+            metadata.pageResults = pdfResult.pageResults.map(pr => ({
+              pageNum: pr.pageNum,
+              hasError: !!pr.error,
+              error: pr.error,
+              textLength: pr.result?.text?.length || 0,
+              confidence: pr.result?.confidence || 0
+            }));
+          }
           
           console.log(`✅ Scanned PDF OCR processing completed for ${fileName}`);
-          console.log(`📊 Engine: ${pdfResult.engine || 'unknown'}, Confidence: ${pdfResult.confidence.toFixed(1)}%, Language: ${pdfResult.language}`);
-          console.log(`⏱️ Processing time: ${pdfResult.processingTime}ms, Pages: ${pdfResult.pagesProcessed}/${pdfResult.totalPages}`);
-        } else {
+          console.log(`📊 Engine: ${pdfResult.engine}, Confidence: ${pdfResult.confidence.toFixed(1)}%, Language: ${pdfResult.language}`);
+          console.log(`⏱️ Processing: ${pdfResult.processingTime}ms total (${pdfResult.conversionTime}ms convert + ${pdfResult.ocrTime}ms OCR)`);
+          console.log(`📄 Pages: ${pdfResult.pagesProcessed}/${pdfResult.totalPages} processed successfully`);
+          
+          if (pdfResult.language === 'hebrew') {
+            console.log(`🔤 Hebrew text detected - enhanced processing enabled`);
+          }
+          
+        } else if (typeof pdfResult === 'string') {
           // Regular PDF with embedded text
           extractedText = pdfResult;
+          metadata.isScannedPDF = false;
+          console.log(`📄 Standard PDF text extraction: ${extractedText.length} characters`);
+        } else {
+          throw new Error('Invalid PDF processing result');
         }
+        
       } else if (this.isImageFile(fileName)) {
         // Process image files with Google Vision OCR
-        console.log(`🖼️ Processing image file: ${fileName}`);
+        console.log(`🖼️ Starting image OCR processing: ${fileName}`);
+        reportProgress('ocr_processing', { stage: 'image_ocr' });
+        metadata.processingSteps.push({ step: 'image_ocr_started', timestamp: new Date().toISOString() });
+        
         try {
-          const ocrResult = await this.ocrService.extractFromImage(filePath);
+          const ocrResult = await this.ocrService.extractFromImage(workingFilePath);
           extractedText = ocrResult.text;
+          metadata.processingSteps.push({ step: 'image_ocr_completed', timestamp: new Date().toISOString() });
           
-          // Store OCR metadata including language detection and engine info
+          // Store comprehensive OCR metadata
           metadata.ocrConfidence = ocrResult.confidence;
           metadata.wordCount = ocrResult.wordCount;
           metadata.detectedLanguage = ocrResult.language;
@@ -110,130 +207,299 @@ class DocumentService {
           metadata.ocrEngine = ocrResult.engine;
           metadata.processingTime = ocrResult.processingTime;
           
-          console.log(`✅ OCR processing completed for ${fileName}`);
+          console.log(`✅ Image OCR processing completed for ${fileName}`);
           console.log(`📊 Engine: ${ocrResult.engine}, Confidence: ${ocrResult.confidence.toFixed(1)}%, Language: ${ocrResult.language}`);
+          console.log(`📄 Extracted ${ocrResult.text.length} characters, ${ocrResult.wordCount} words`);
+          
+          if (ocrResult.language === 'hebrew') {
+            console.log(`🔤 Hebrew text detected - enhanced processing enabled`);
+          }
           
         } catch (ocrError) {
           console.error(`❌ OCR processing failed for ${fileName}:`, ocrError.message);
+          metadata.processingSteps.push({ 
+            step: 'image_ocr_failed', 
+            timestamp: new Date().toISOString(), 
+            error: ocrError.message 
+          });
           
-          // Still create the document record with error info
-          extractedText = `[OCR Processing Failed: ${ocrError.message}]\n\nPlease try:\n1. Using a higher resolution image\n2. Ensuring the image is clear and well-lit\n3. Converting to PNG or JPG format\n4. Checking that text in the image is legible`;
-          
-          metadata.ocrError = ocrError.message;
-          metadata.ocrConfidence = 0;
-          metadata.wordCount = 0;
-          metadata.detectedLanguage = 'unknown';
-          metadata.hasHebrew = false;
-          metadata.hasArabic = false;
+          // Fail fast instead of creating broken documents
+          throw new Error(`Image OCR failed: ${ocrError.message}. Please ensure the image is clear and contains readable text.`);
         }
       } else {
-        throw new Error(`Unsupported file type: ${fileExt}`);
+        throw new Error(`Unsupported file type: ${fileExt}. Supported formats: PDF, PNG, JPG, JPEG, GIF, BMP, WEBP`);
       }
 
-      // Enhanced contract-aware chunking
+      // Validate extracted text
+      if (!extractedText || extractedText.trim().length === 0) {
+        throw new Error('No text could be extracted from the document. The document may be empty or contain only images/graphics.');
+      }
+
+      console.log(`📝 Text extraction successful: ${extractedText.length} characters extracted`);
+
+      // Document type detection and chunking
+      reportProgress('document_analysis', { textLength: extractedText.length });
+      console.log(`🔍 Analyzing document structure and preparing chunks...`);
+      metadata.processingSteps.push({ step: 'chunking_started', timestamp: new Date().toISOString() });
+      
+      const documentType = this.detectDocumentType(extractedText);
+      console.log(`📋 Document type detected: ${documentType}`);
+      
+      reportProgress('chunking', { documentType });
       const chunks = this.contractAwareChunking(extractedText, {
         chunkSize: 512,
         overlap: 50,
-        documentType: this.detectDocumentType(extractedText)
+        documentType: documentType
+      });
+      
+      metadata.processingSteps.push({ 
+        step: 'chunking_completed', 
+        timestamp: new Date().toISOString(),
+        chunksCreated: chunks.length,
+        documentType: documentType
       });
 
+      console.log(`📝 Created ${chunks.length} chunks using ${documentType} strategy`);
+
       // Save extracted text and chunks
+      reportProgress('saving', { chunksCount: chunks.length });
+      console.log(`💾 Saving document data...`);
       const textFilePath = path.join(this.documentsPath, `${documentId}.txt`);
       const chunksFilePath = path.join(this.documentsPath, `${documentId}_chunks.json`);
       
       fs.writeFileSync(textFilePath, extractedText, 'utf-8');
       fs.writeFileSync(chunksFilePath, JSON.stringify(chunks, null, 2), 'utf-8');
 
-      // Update metadata
+      // Update metadata with final processing info
       metadata.status = 'ready';
       metadata.textLength = extractedText.length;
       metadata.chunksCount = chunks.length;
+      metadata.documentType = documentType;
       metadata.processingCompletedAt = new Date().toISOString();
 
-      // Store metadata
+      // Store metadata before vector processing (in case vector processing fails)
       this.saveDocumentMetadata(documentId, metadata);
+      metadata.processingSteps.push({ step: 'metadata_saved', timestamp: new Date().toISOString() });
 
       // Add to vector database for semantic search
+      reportProgress('vectorizing', { chunksCount: chunks.length });
+      console.log(`🧠 Adding to vector database...`);
+      metadata.processingSteps.push({ step: 'vectorization_started', timestamp: new Date().toISOString() });
+      
       try {
-        await this.vectorService.addDocument(documentId, chunks);
+        await this.vectorService.addDocument(documentId, chunks, (vectorProgress) => {
+          reportProgress('vectorizing', { 
+            chunksProcessed: vectorProgress.processed || 0,
+            totalChunks: vectorProgress.total || chunks.length,
+            currentChunk: vectorProgress.current || 0
+          });
+        });
         metadata.vectorized = true;
-      } catch (error) {
-        console.warn('⚠️ Could not add to vector database:', error.message);
+        metadata.processingSteps.push({ step: 'vectorization_completed', timestamp: new Date().toISOString() });
+        console.log(`✅ Added ${chunks.length} chunks to vector database`);
+      } catch (vectorError) {
+        console.warn('⚠️ Could not add to vector database:', vectorError.message);
         metadata.vectorized = false;
+        metadata.vectorizationError = vectorError.message;
+        metadata.processingSteps.push({ 
+          step: 'vectorization_failed', 
+          timestamp: new Date().toISOString(),
+          error: vectorError.message
+        });
       }
 
-      console.log(`✅ Document processed successfully: ${fileName}`);
-      console.log(`📊 Extracted ${extractedText.length} characters, created ${chunks.length} chunks`);
-      console.log(`🧠 Vector database: ${metadata.vectorized ? 'Added' : 'Skipped'}`);
+      // Update metadata with final vectorization status
+      this.saveDocumentMetadata(documentId, metadata);
+
+      console.log(`\n✅ Document processed successfully: ${fileName}`);
+      console.log(`📊 Summary: ${extractedText.length} characters → ${chunks.length} chunks`);
+      console.log(`🔤 Language: ${metadata.detectedLanguage || 'unknown'} | Type: ${documentType}`);
+      console.log(`🧠 Vector database: ${metadata.vectorized ? '✅ Added' : '❌ Skipped'}`);
+      
+      if (metadata.hasHebrew) {
+        console.log(`🔤 Hebrew processing: Successfully handled Hebrew content`);
+      }
+
+      // Report final completion
+      reportProgress('completed', { 
+        success: true,
+        chunksCount: chunks.length,
+        textLength: extractedText.length,
+        documentType: documentType,
+        language: metadata.detectedLanguage,
+        vectorized: metadata.vectorized,
+        processingTime: Date.now() - startTime
+      });
+
+      // Clean up temporary file if created
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        try {
+          fs.unlinkSync(tempFilePath);
+          console.log(`🧹 Cleaned up temporary file: ${path.basename(tempFilePath)}`);
+        } catch (cleanupError) {
+          console.warn(`⚠️ Could not clean up temp file: ${cleanupError.message}`);
+        }
+      }
 
       return {
         success: true,
         document: metadata,
         chunksCount: chunks.length,
         textLength: extractedText.length,
-        vectorized: metadata.vectorized
+        vectorized: metadata.vectorized,
+        documentType: documentType,
+        language: metadata.detectedLanguage
       };
 
     } catch (error) {
-      console.error('❌ Error processing document:', error);
+      console.error(`\n❌ Error processing document ${fileName}:`, error.message);
+      console.error(`📄 Document ID: ${documentId}`);
+      console.error(`🔍 Error details:`, error);
+      
+      // Try to save error metadata if possible
+      try {
+        const errorMetadata = {
+          id: documentId,
+          originalName: fileName,
+          fileSize: fs.existsSync(filePath) ? fs.statSync(filePath).size : 0,
+          uploadedAt: new Date().toISOString(),
+          fileType: path.extname(fileName).toLowerCase(),
+          status: 'error',
+          error: error.message,
+          errorTimestamp: new Date().toISOString(),
+          processingSteps: metadata?.processingSteps || []
+        };
+        
+        // Add final error step
+        errorMetadata.processingSteps.push({
+          step: 'processing_failed',
+          timestamp: new Date().toISOString(),
+          error: error.message
+        });
+        
+        this.saveDocumentMetadata(documentId, errorMetadata);
+        console.log(`💾 Error metadata saved for debugging`);
+      } catch (metadataError) {
+        console.error(`⚠️ Could not save error metadata:`, metadataError.message);
+      }
+
+      // Clean up temporary file if created (even on error)
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        try {
+          fs.unlinkSync(tempFilePath);
+          console.log(`🧹 Cleaned up temporary file after error: ${path.basename(tempFilePath)}`);
+        } catch (cleanupError) {
+          console.warn(`⚠️ Could not clean up temp file after error: ${cleanupError.message}`);
+        }
+      }
+      
       return {
         success: false,
-        error: error.message
+        error: error.message,
+        documentId: documentId,
+        fileName: fileName
       };
     }
   }
 
-  async extractTextFromPDF(buffer, filePath, fileName) {
+  async extractTextFromPDF(buffer, filePath, fileName, progressCallback = null) {
     try {
       // First, try standard PDF text extraction
       const data = await pdfParse(buffer);
-      const extractedText = data.text;
+      const extractedText = data.text.trim();
       
       console.log(`📄 PDF pages: ${data.numpages}, Text length: ${extractedText.length}`);
       
-      // Check if this is likely a scanned PDF (very little text per page)
+      // Smart OCR detection: Check if this is likely a scanned PDF
       const avgCharsPerPage = extractedText.length / data.numpages;
-      const isLikelyScanned = avgCharsPerPage < 100; // Less than 100 characters per page suggests scanned PDF
+      const hasMinimalText = avgCharsPerPage < 150; // Increased threshold for Hebrew/Arabic
+      const isLikelyScanned = hasMinimalText || this.containsGarbledText(extractedText);
       
-      if (isLikelyScanned && extractedText.length < 200) {
-        console.log(`🔍 Detected scanned PDF (${avgCharsPerPage.toFixed(1)} chars/page). Attempting Google Vision OCR on PDF...`);
+      console.log(`📊 PDF Analysis: ${avgCharsPerPage.toFixed(1)} chars/page, scanned: ${isLikelyScanned}`);
+      
+      if (isLikelyScanned) {
+        console.log(`🔍 Detected scanned PDF. Attempting Google Vision OCR...`);
         
         try {
           // Use Google Vision OCR for scanned PDFs
-          const ocrResult = await this.ocrService.extractFromPDF(filePath);
+          const ocrResult = await this.ocrService.extractFromPDF(filePath, progressCallback);
           
-          if (ocrResult && ocrResult.success && ocrResult.text && ocrResult.text.length > extractedText.length) {
-            console.log(`✅ PDF OCR successful: ${ocrResult.text.length} characters vs ${extractedText.length} from standard extraction`);
+          if (ocrResult && ocrResult.success && ocrResult.text && ocrResult.text.trim().length > 0) {
+            console.log(`✅ PDF OCR successful: ${ocrResult.text.length} characters extracted`);
+            console.log(`📊 OCR confidence: ${ocrResult.confidence.toFixed(1)}%, language: ${ocrResult.language}`);
+            
+            // Always prefer OCR results for scanned PDFs, even if shorter than original
+            // (original might contain garbled extraction artifacts)
             return ocrResult; // Return the full OCR result object
           } else {
-            console.log('⚠️ PDF OCR did not improve results, using standard extraction');
-            return extractedText;
+            console.warn('⚠️ PDF OCR returned no text, checking if original extraction has content');
+            
+            // If OCR failed but we have some original text, use it with a warning
+            if (extractedText.length > 10) {
+              console.log('📄 Using standard extraction with OCR failure notice');
+              return extractedText + '\n\n[NOTE: This appears to be a scanned PDF. OCR processing failed but some text was extracted. Quality may be limited.]';
+            } else {
+              throw new Error('Both standard extraction and OCR failed to extract meaningful text');
+            }
           }
         } catch (ocrError) {
           console.error('❌ PDF OCR failed:', ocrError.message);
-          return extractedText + '\n\n[NOTE: This appears to be a scanned PDF. OCR processing failed. For better text extraction, try converting to images (PNG/JPG) and re-upload.]';
+          
+          // If we have some standard text, use it; otherwise, fail
+          if (extractedText.length > 10) {
+            return extractedText + '\n\n[NOTE: This appears to be a scanned PDF. OCR processing failed. For better text extraction, try converting to high-quality images (PNG/JPG) and re-upload.]';
+          } else {
+            throw new Error(`PDF OCR failed and no standard text available: ${ocrError.message}`);
+          }
         }
       }
       
+      // Document has good standard text extraction
+      console.log('✅ Using standard PDF text extraction');
       return extractedText;
+      
     } catch (error) {
       throw new Error(`PDF extraction failed: ${error.message}`);
     }
   }
 
+  // Helper method to detect garbled text that suggests scanning artifacts
+  containsGarbledText(text) {
+    if (!text || text.length < 20) return false;
+    
+    // Check for common PDF extraction artifacts
+    const garbledPatterns = [
+      /[�]{2,}/g, // Replacement characters
+      /(.)\1{10,}/g, // Repeated single characters
+      /^[\s\n\r]*$/g, // Only whitespace
+      /[^\x00-\x7F\u0590-\u05FF\u0600-\u06FF\u0020-\u007E]{20,}/g // Long sequences of non-printable chars (excluding Hebrew/Arabic)
+    ];
+    
+    return garbledPatterns.some(pattern => pattern.test(text));
+  }
+
 
 
   detectDocumentType(text) {
-    const legalTerms = [
+    const englishLegalTerms = [
       'whereas', 'party', 'parties', 'agreement', 'contract', 'shall', 'herein',
       'liability', 'clause', 'provision', 'terms', 'conditions', 'jurisdiction',
       'breach', 'terminate', 'indemnify', 'covenant', 'consideration'
     ];
     
-    const textLower = text.toLowerCase();
-    const legalTermCount = legalTerms.filter(term => textLower.includes(term)).length;
+    // Hebrew legal terms (common in Israeli contracts)
+    const hebrewLegalTerms = [
+      'הסכם', 'חוזה', 'צד', 'צדדים', 'הצדדים', 'תנאי', 'תנאים', 'הוראות',
+      'אחריות', 'חובות', 'זכויות', 'התחייבות', 'התחייבויות', 'סיום', 'ביטול',
+      'פיצוי', 'פיצויים', 'שיפוי', 'נזק', 'נזקים', 'הפרה', 'מוסכם', 'בתוקף'
+    ];
     
-    if (legalTermCount >= 5) {
+    const textLower = text.toLowerCase();
+    const englishTermCount = englishLegalTerms.filter(term => textLower.includes(term)).length;
+    const hebrewTermCount = hebrewLegalTerms.filter(term => text.includes(term)).length;
+    
+    // Check for legal document indicators
+    if (englishTermCount >= 4 || hebrewTermCount >= 3) {
       return 'legal_contract';
     } else if (textLower.includes('assignment') && textLower.includes('manager')) {
       return 'assignment';
@@ -339,8 +605,8 @@ class DocumentService {
       return chunks;
     }
     
-    // Split by sentences with Hebrew and English punctuation support
-    const sentences = text.split(/[.!?؟։។]|\.|\?|\!/).filter(s => s.trim().length > 0);
+    // Split by sentences with comprehensive Hebrew, Arabic, and English punctuation support
+    const sentences = text.split(/[.!?؟։។׃״׳]/).filter(s => s.trim().length > 0);
     let currentChunk = '';
     let chunkId = 0;
     
@@ -643,6 +909,62 @@ class DocumentService {
 
   clearGoogleVisionServiceAccount() {
     this.ocrService.clearServiceAccount();
+  }
+
+  // Test OCR connection with a simple API call
+  async testOCRConnection() {
+    try {
+      if (!this.ocrService.isReady()) {
+        return {
+          success: false,
+          message: 'OCR service not initialized. Please configure Google Vision API first.'
+        };
+      }
+
+      // Test with a simple API call to verify connectivity
+      const testResult = await this.ocrService.testConnection();
+      
+      return {
+        success: testResult.success,
+        message: testResult.message || 'OCR connection test completed',
+        details: testResult.details
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `OCR connection test failed: ${error.message}`
+      };
+    }
+  }
+
+  // Helper method to create safe ASCII file paths for processing
+  createSafeFilePath(originalPath, documentId) {
+    const ext = path.extname(originalPath);
+    const tempDir = path.join(require('electron').app.getPath('temp'), 'contract-processing');
+    
+    // Ensure temp directory exists
+    if (!require('fs').existsSync(tempDir)) {
+      require('fs').mkdirSync(tempDir, { recursive: true });
+    }
+    
+    // Create safe ASCII filename
+    const safeFileName = `doc_${documentId}${ext}`;
+    return path.join(tempDir, safeFileName);
+  }
+
+  // Copy file to safe path before processing
+  async copyToSafePath(originalPath, safePath) {
+    return new Promise((resolve, reject) => {
+      const fs = require('fs');
+      const readStream = fs.createReadStream(originalPath);
+      const writeStream = fs.createWriteStream(safePath);
+      
+      readStream.on('error', reject);
+      writeStream.on('error', reject);
+      writeStream.on('finish', resolve);
+      
+      readStream.pipe(writeStream);
+    });
   }
 
   isImageFile(fileName) {

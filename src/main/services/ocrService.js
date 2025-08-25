@@ -72,12 +72,17 @@ class OCRService {
     try {
       console.log(`🔍 Processing image: ${path.basename(imagePath)}`);
 
-      // Configure request with language hints for Hebrew/Arabic
+      // Configure request with comprehensive language support for Hebrew/Arabic
       const request = {
         image: { content: fs.readFileSync(imagePath).toString('base64') },
-        features: [{ type: 'DOCUMENT_TEXT_DETECTION' }], // Better for documents than TEXT_DETECTION
+        features: [
+          { type: 'DOCUMENT_TEXT_DETECTION' } // Better for documents than TEXT_DETECTION
+        ],
         imageContext: {
-          languageHints: ['he', 'ar', 'en'] // Hebrew, Arabic, English
+          languageHints: ['he', 'ar', 'en'], // Hebrew, Arabic, English
+          textDetectionParams: {
+            enableTextDetectionConfidenceScore: true
+          }
         }
       };
 
@@ -120,11 +125,12 @@ class OCRService {
   }
 
   /**
-   * Extract text from PDF by converting to images first
+   * Extract text from PDF with smart page-by-page analysis
+   * Only performs OCR on pages that need it
    * @param {string} pdfPath - Path to PDF file
    * @returns {Object} OCR result with combined text from all pages
    */
-  async extractFromPDF(pdfPath) {
+  async extractFromPDF(pdfPath, progressCallback = null) {
     if (!this.isReady()) {
       throw new Error('OCR service not initialized. Please configure Google Vision API first.');
     }
@@ -133,21 +139,21 @@ class OCRService {
     const tempDir = path.join(app.getPath('temp'), 'contract-ocr-' + Date.now());
     
     try {
-      console.log(`📄 Processing PDF: ${path.basename(pdfPath)}`);
+      console.log(`📄 Processing PDF with smart OCR: ${path.basename(pdfPath)}`);
 
       // Create temp directory
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
       }
 
-      // Convert PDF to images
-      console.log('🔄 Converting PDF pages to images...');
+      // Get PDF info and convert to images
+      console.log('🔄 Converting PDF pages to high-quality images...');
       const convertOptions = {
         format: 'png',
         out_dir: tempDir,
         out_prefix: 'page',
         page: null, // Convert all pages
-        resolution: 200 // Good balance between quality and processing time
+        resolution: 300 // Higher resolution for better OCR accuracy
       };
 
       const convertStartTime = Date.now();
@@ -157,33 +163,66 @@ class OCRService {
 
       console.log(`✅ Converted ${info.pages} PDF pages in ${conversionTime}ms`);
 
-      // Process each page image with OCR
+      // Smart page-by-page processing
       let combinedText = '';
       let totalConfidence = 0;
       let totalWords = 0;
       let successfulPages = 0;
       let ocrTime = 0;
+      const pageResults = [];
 
       for (let pageNum = 1; pageNum <= info.pages; pageNum++) {
         const imagePath = path.join(tempDir, `page-${pageNum}.png`);
+        
+        // Report progress for current page
+        if (progressCallback) {
+          progressCallback({
+            isOCR: true,
+            currentPage: pageNum,
+            totalPages: info.pages,
+            pagesProcessed: successfulPages,
+            stage: 'processing_page'
+          });
+        }
         
         if (fs.existsSync(imagePath)) {
           try {
             console.log(`📄 Processing page ${pageNum}/${info.pages}...`);
             
+            // First, do a quick analysis to see if this page needs OCR
+            const pageNeedsOCR = await this.pageNeedsOCR(imagePath);
+            
+            if (!pageNeedsOCR) {
+              console.log(`⏭️ Page ${pageNum} appears to be blank/minimal content, skipping OCR`);
+              continue;
+            }
+            
             const pageResult = await this.extractFromImage(imagePath);
+            pageResults.push({ pageNum, result: pageResult });
             
             if (pageResult.success && pageResult.text.trim().length > 0) {
-              combinedText += pageResult.text + '\n\n';
+              // Add page separator for multi-page documents
+              if (combinedText.length > 0) {
+                combinedText += '\n\n--- Page ' + pageNum + ' ---\n\n';
+              }
+              
+              combinedText += pageResult.text.trim();
               totalConfidence += pageResult.confidence;
               totalWords += pageResult.wordCount;
               ocrTime += pageResult.processingTime;
               successfulPages++;
+              
+              console.log(`✅ Page ${pageNum}: ${pageResult.text.length} chars, confidence: ${pageResult.confidence.toFixed(1)}%`);
+            } else {
+              console.warn(`⚠️ Page ${pageNum} OCR returned no text`);
             }
 
           } catch (pageError) {
             console.warn(`⚠️ Failed to process page ${pageNum}:`, pageError.message);
+            pageResults.push({ pageNum, error: pageError.message });
           }
+        } else {
+          console.warn(`⚠️ Page ${pageNum} image not found: ${imagePath}`);
         }
       }
 
@@ -195,22 +234,39 @@ class OCRService {
 
       if (successfulPages === 0) {
         console.warn('❌ No text extracted from any PDF pages');
-        return this.createEmptyResult();
+        return {
+          text: '',
+          confidence: 0,
+          language: 'unknown',
+          wordCount: 0,
+          processingTime: totalTime,
+          conversionTime: conversionTime,
+          ocrTime: ocrTime,
+          pagesProcessed: 0,
+          totalPages: info.pages,
+          engine: 'google_vision',
+          success: false,
+          error: 'No text could be extracted from any pages'
+        };
       }
 
-      console.log(`✅ PDF OCR completed: ${combinedText.length} characters from ${successfulPages}/${info.pages} pages`);
-      console.log(`📊 Average confidence: ${avgConfidence.toFixed(1)}%, Total time: ${totalTime}ms`);
+      // Detect overall language from combined text
+      const detectedLanguage = this.detectLanguage(combinedText);
+      
+      console.log(`✅ Smart PDF OCR completed: ${combinedText.length} characters from ${successfulPages}/${info.pages} pages`);
+      console.log(`📊 Language: ${detectedLanguage}, Average confidence: ${avgConfidence.toFixed(1)}%, Total time: ${totalTime}ms`);
 
       return {
         text: combinedText.trim(),
         confidence: avgConfidence,
-        language: this.detectLanguage(combinedText),
+        language: detectedLanguage,
         wordCount: totalWords,
         processingTime: totalTime,
         conversionTime: conversionTime,
         ocrTime: ocrTime,
         pagesProcessed: successfulPages,
         totalPages: info.pages,
+        pageResults: pageResults,
         engine: 'google_vision',
         success: true
       };
@@ -220,7 +276,50 @@ class OCRService {
       await this.cleanupTempDir(tempDir);
       
       console.error('❌ PDF OCR failed:', error.message);
-      throw new Error(`PDF OCR failed: ${error.message}`);
+      throw new Error(`Smart PDF OCR failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Quick analysis to determine if a page needs OCR processing
+   * Uses a lightweight check to avoid processing blank/minimal pages
+   * @param {string} imagePath - Path to page image
+   * @returns {boolean} True if page likely contains meaningful text
+   */
+  async pageNeedsOCR(imagePath) {
+    try {
+      // Use TEXT_DETECTION (faster) for quick analysis instead of DOCUMENT_TEXT_DETECTION
+      const request = {
+        image: { content: fs.readFileSync(imagePath).toString('base64') },
+        features: [{ type: 'TEXT_DETECTION' }]
+      };
+
+      const [result] = await this.client.annotateImage(request);
+      
+      if (result.error) {
+        console.warn(`⚠️ Quick OCR analysis failed: ${result.error.message}, defaulting to OCR`);
+        return true; // When in doubt, process it
+      }
+
+      const textAnnotations = result.textAnnotations;
+      
+      // If no text detected or very minimal text, skip OCR
+      if (!textAnnotations || textAnnotations.length === 0) {
+        return false;
+      }
+      
+      const detectedText = textAnnotations[0]?.description || '';
+      
+      // Skip if less than 10 characters detected (likely noise/artifacts)
+      if (detectedText.trim().length < 10) {
+        return false;
+      }
+      
+      return true;
+      
+    } catch (error) {
+      console.warn('⚠️ Page analysis failed:', error.message, 'defaulting to OCR');
+      return true; // When in doubt, process it
     }
   }
 
@@ -242,12 +341,35 @@ class OCRService {
   }
 
   /**
-   * Detect primary language in text
+   * Detect primary language in text with improved accuracy
    */
   detectLanguage(text) {
-    if (/[\u0590-\u05FF]/.test(text)) return 'hebrew';
-    if (/[\u0600-\u06FF]/.test(text)) return 'arabic';
-    return 'english';
+    if (!text || text.trim().length < 10) return 'unknown';
+    
+    // Count characters for each language
+    const hebrewChars = (text.match(/[\u0590-\u05FF]/g) || []).length;
+    const arabicChars = (text.match(/[\u0600-\u06FF]/g) || []).length;
+    const latinChars = (text.match(/[a-zA-Z]/g) || []).length;
+    const totalChars = text.replace(/\s/g, '').length;
+    
+    // Calculate percentages
+    const hebrewPct = hebrewChars / totalChars;
+    const arabicPct = arabicChars / totalChars;
+    const latinPct = latinChars / totalChars;
+    
+    console.log(`🔤 Language detection: Hebrew ${(hebrewPct * 100).toFixed(1)}%, Arabic ${(arabicPct * 100).toFixed(1)}%, Latin ${(latinPct * 100).toFixed(1)}%`);
+    
+    // Determine primary language (threshold 20% to handle mixed content)
+    if (hebrewPct > 0.2 && hebrewPct >= arabicPct && hebrewPct >= latinPct) {
+      return 'hebrew';
+    } else if (arabicPct > 0.2 && arabicPct >= hebrewPct && arabicPct >= latinPct) {
+      return 'arabic';
+    } else if (latinPct > 0.4) {
+      return 'english';
+    } else {
+      // Mixed or unclear content
+      return hebrewPct > arabicPct ? 'hebrew' : (arabicPct > latinPct ? 'arabic' : 'english');
+    }
   }
 
   /**
@@ -328,6 +450,46 @@ class OCRService {
   }
 
     return false;
+  }
+
+  /**
+   * Test OCR service connection with minimal API call
+   */
+  async testConnection() {
+    try {
+      if (!this.isReady()) {
+        return {
+          success: false,
+          message: 'OCR service not initialized. Please configure Google Vision API first.'
+        };
+      }
+
+      // Test with a minimal API call - just check if we can get project info
+      console.log('🔍 Testing Google Vision API connectivity...');
+      const projectId = await this.client.getProjectId();
+      
+      console.log(`✅ OCR connection test successful. Project ID: ${projectId}`);
+      return {
+        success: true,
+        message: `Successfully connected to Google Vision API`,
+        details: {
+          projectId: projectId,
+          engine: 'google_vision',
+          supportedLanguages: ['hebrew', 'arabic', 'english'],
+          isReady: true
+        }
+      };
+    } catch (error) {
+      console.error('❌ OCR connection test failed:', error.message);
+      return {
+        success: false,
+        message: `Connection test failed: ${error.message}`,
+        details: {
+          error: error.message,
+          isReady: false
+        }
+      };
+    }
   }
 
   /**

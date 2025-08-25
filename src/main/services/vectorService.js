@@ -43,7 +43,7 @@ class VectorService {
         this.vectorStore.set('chunks', {});
         this.vectorStore.set('metadata', {
           created: new Date().toISOString(),
-          version: '1.0.0',
+          version: '1.2.8',
           description: 'Contract document chunks for semantic search'
         });
         console.log('📚 New vector database created');
@@ -106,16 +106,27 @@ class VectorService {
     }
   }
 
-  async addDocument(documentId, chunks) {
+  async addDocument(documentId, chunks, progressCallback = null) {
     try {
       await this.initialize();
 
       const documents = this.vectorStore.get('documents') || {};
       const chunksStore = this.vectorStore.get('chunks') || {};
 
-      // Process each chunk
-      for (const chunk of chunks) {
+      // Process each chunk with progress tracking
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
         const chunkId = `${documentId}_chunk_${chunk.id}`;
+        
+        // Report progress
+        if (progressCallback) {
+          progressCallback({
+            processed: i,
+            total: chunks.length,
+            current: i + 1,
+            percentage: Math.round(((i + 1) / chunks.length) * 100)
+          });
+        }
         
         try {
           // Generate embedding for the chunk text
