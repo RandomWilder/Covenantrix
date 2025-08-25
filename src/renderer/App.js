@@ -54,7 +54,7 @@ const App = () => {
     <div className="app">
       <header className="app-header">
         <h1>Contract RAG Manager</h1>
-        <span className="version">v1.2.8</span>
+        <span className="version">v1.2.10</span>
       </header>
 
       <div className="main-content">
