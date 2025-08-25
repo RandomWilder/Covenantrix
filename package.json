@@ -1,6 +1,6 @@
 {
   "name": "contract-rag-manager",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "AI-Powered Contract Analysis with Conversational RAG Interface",
   "author": "RandomWilder",
   "main": "src/main/main.js",
@@ -23,12 +23,7 @@
       "package.json"
     ],
     "asarUnpack": [
-      "**/*.node",
-      "**/node_modules/sharp/**/*",
-      "**/node_modules/@img/**/*",
-      "**/node_modules/tesseract.js/**/*",
-      "**/node_modules/pdf-poppler/**/*",
-      "**/node_modules/@google-cloud/**/*"
+      "**/*.node"
     ],
     "win": {
       "target": [
@@ -41,6 +36,7 @@
       ],
       "publisherName": "Covenantrix",
       "verifyUpdateCodeSignature": false,
+      "sign": null,
       "artifactName": "${productName}-${version}-Setup.${ext}"
     },
     "mac": {
@@ -49,13 +45,17 @@
         {
           "target": "dmg",
           "arch": [
-            "universal"
+            "x64",
+            "arm64"
           ]
         }
       ],
-      "artifactName": "${productName}-${version}-Universal.${ext}",
+      "identity": null,
       "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "entitlements": null,
+      "entitlementsInherit": null,
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
