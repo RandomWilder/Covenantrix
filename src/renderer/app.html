@@ -12,6 +12,111 @@
             box-sizing: border-box;
         }
 
+        /* 2025 Design System - CSS Custom Properties */
+        :root {
+            /* === PRIMARY COLORS (2025 Palette) === */
+            --primary-50: #f0f4ff;
+            --primary-100: #e0e7ff;
+            --primary-200: #c7d2fe;
+            --primary-300: #a5b4fc;
+            --primary-400: #818cf8;
+            --primary-500: #6366f1;
+            --primary-600: #4f46e5;
+            --primary-700: #4338ca;
+            --primary-800: #3730a3;
+            --primary-900: #312e81;
+
+            /* === NEUTRAL COLORS (Refined 2025) === */
+            --neutral-0: #ffffff;
+            --neutral-25: #fcfcfd;
+            --neutral-50: #f8fafc;
+            --neutral-100: #f1f5f9;
+            --neutral-200: #e2e8f0;
+            --neutral-300: #cbd5e1;
+            --neutral-400: #94a3b8;
+            --neutral-500: #64748b;
+            --neutral-600: #475569;
+            --neutral-700: #334155;
+            --neutral-800: #1e293b;
+            --neutral-900: #0f172a;
+
+            /* === ACCENT COLORS === */
+            --accent-purple: #8b5cf6;
+            --accent-blue: #3b82f6;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+
+            /* === SEMANTIC COLORS === */
+            --success-50: #ecfdf5;
+            --success-500: #10b981;
+            --success-600: #059669;
+            --warning-50: #fffbeb;
+            --warning-500: #f59e0b;
+            --warning-600: #d97706;
+            --error-50: #fef2f2;
+            --error-500: #ef4444;
+            --error-600: #dc2626;
+
+            /* === GRADIENTS (2025 Style) === */
+            --gradient-primary: linear-gradient(135deg, var(--primary-500) 0%, var(--accent-purple) 100%);
+            --gradient-surface: linear-gradient(135deg, var(--neutral-50) 0%, var(--neutral-100) 100%);
+            --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 100%);
+            
+            /* === SHADOWS (Neumorphism 2025) === */
+            --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+            --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+            
+            /* Neumorphism shadows */
+            --neu-shadow-light: 6px 6px 12px rgba(0, 0, 0, 0.1), -6px -6px 12px rgba(255, 255, 255, 0.8);
+            --neu-shadow-medium: 8px 8px 16px rgba(0, 0, 0, 0.15), -8px -8px 16px rgba(255, 255, 255, 0.9);
+            --neu-shadow-heavy: 12px 12px 24px rgba(0, 0, 0, 0.2), -12px -12px 24px rgba(255, 255, 255, 1);
+            --neu-shadow-inset: inset 4px 4px 8px rgba(0, 0, 0, 0.1), inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+
+            /* === SPACING (Consistent Scale) === */
+            --space-1: 0.25rem;   /* 4px */
+            --space-2: 0.5rem;    /* 8px */
+            --space-3: 0.75rem;   /* 12px */
+            --space-4: 1rem;      /* 16px */
+            --space-5: 1.25rem;   /* 20px */
+            --space-6: 1.5rem;    /* 24px */
+            --space-8: 2rem;      /* 32px */
+            --space-10: 2.5rem;   /* 40px */
+            --space-12: 3rem;     /* 48px */
+            --space-16: 4rem;     /* 64px */
+            --space-20: 5rem;     /* 80px */
+
+            /* === BORDER RADIUS (Modern 2025) === */
+            --radius-xs: 0.25rem;  /* 4px */
+            --radius-sm: 0.375rem; /* 6px */
+            --radius-md: 0.5rem;   /* 8px */
+            --radius-lg: 0.75rem;  /* 12px */
+            --radius-xl: 1rem;     /* 16px */
+            --radius-2xl: 1.5rem;  /* 24px */
+            --radius-full: 9999px;
+
+            /* === TYPOGRAPHY === */
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            --font-mono: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+            
+            /* === TRANSITIONS (Smooth 2025) === */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-bounce: 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+            /* === GLASS EFFECTS === */
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --glass-blur: blur(16px);
+            --glass-saturation: saturate(180%);
+        }
+
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -930,6 +1035,166 @@
             display: none;
         }
 
+        /* 📁 Enhanced folder management styles */
+        .folder-controls {
+            padding: 8px;
+            border-bottom: 1px solid #333;
+            margin-bottom: 8px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .folder-control-btn {
+            padding: 4px 8px;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 4px;
+            color: #e5e7eb;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .folder-control-btn:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+
+        /* 🎯 Document Focus Styles */
+        .tree-file.document-focused {
+            background: rgba(255, 165, 0, 0.1) !important;
+            border-left: 3px solid #ffa500 !important;
+            padding-left: 9px !important;
+        }
+
+        .tree-file.document-focused .file-name {
+            color: #ffa500 !important;
+            font-weight: 500;
+        }
+
+        .file-action-btn.focus {
+            color: #6b7280;
+            transition: all 0.2s ease;
+        }
+
+        .file-action-btn.focus:hover {
+            color: #ffa500;
+            background: rgba(255, 165, 0, 0.1);
+        }
+
+        .file-action-btn.focus.focused {
+            color: #ffa500;
+            background: rgba(255, 165, 0, 0.2);
+        }
+
+        .file-action-btn.focus.focused:hover {
+            background: rgba(255, 165, 0, 0.3);
+        }
+
+        .folder-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            position: relative;
+        }
+
+        .tree-folder.selected {
+            background: rgba(99, 102, 241, 0.2);
+            border-radius: 4px;
+        }
+
+        .tree-folder.selected .folder-header {
+            padding: 2px 4px;
+        }
+
+        .folder-actions {
+            display: none;
+            align-items: center;
+            gap: 2px;
+            margin-left: auto;
+            padding-right: 4px;
+        }
+
+        .tree-folder:hover .folder-actions {
+            display: flex;
+        }
+
+        .folder-action-btn {
+            padding: 2px 4px;
+            background: rgba(0, 0, 0, 0.3);
+            border: none;
+            border-radius: 3px;
+            color: #cccccc;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            opacity: 0.7;
+        }
+
+        .folder-action-btn:hover {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .folder-action-btn.edit:hover {
+            color: #60a5fa;
+        }
+
+        .folder-action-btn.delete:hover {
+            color: #f87171;
+        }
+
+        .file-actions {
+            display: none;
+            align-items: center;
+            gap: 2px;
+            margin-left: auto;
+            padding-right: 4px;
+        }
+
+        .tree-file:hover .file-actions {
+            display: flex;
+        }
+
+        .file-action-btn.move {
+            background: rgba(59, 130, 246, 0.2);
+        }
+
+        .file-action-btn.move:hover {
+            background: rgba(59, 130, 246, 0.4);
+            color: #93c5fd;
+        }
+
+        /* 🎯 RAG Context Indicator */
+        .rag-context-indicator {
+            margin: 8px 16px 0 16px;
+            padding: 6px 12px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 6px;
+            color: #10b981;
+            font-size: 12px;
+            font-weight: 500;
+            text-align: center;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .tree-file {
             padding-left: 42px;
         }
@@ -1080,6 +1345,57 @@
             border-bottom: 1px solid #e2e8f0;
         }
 
+        /* 🎭 Persona Selector Styles */
+        .persona-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .persona-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            background: white;
+            color: #6b7280;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .persona-btn:hover {
+            border-color: #9ca3af;
+            background: #f9fafb;
+        }
+
+        .persona-btn.active {
+            border-color: var(--persona-color, #0e639c);
+            background: var(--persona-color, #0e639c);
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .persona-btn.active:hover {
+            background: var(--persona-color-hover, #1177bb);
+        }
+
+        .persona-btn .persona-icon {
+            font-size: 14px;
+        }
+
+        .persona-btn .persona-name {
+            font-weight: 600;
+        }
+
         .chat-header-new h2 {
             font-size: 20px;
             margin: 0;
@@ -1112,7 +1428,7 @@
                         <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.65-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65A.488.488 0 0 0 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11.5c-.04.32-.07.65-.07.97 0 .33.03.65.07.97L2.46 14.97c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.63Z"/>
                     </svg>
                 </button>
-                <span class="version">v1.2.10</span>
+                <span class="version">v1.2.11</span>
             </div>
         </div>
 
@@ -1194,6 +1510,11 @@
                         </div>
                     </div>
                 
+                    <!-- 🎯 RAG Context Indicator -->
+                    <div id="rag-context-indicator" class="rag-context-indicator" style="display: none;">
+                        🎯 Focus: All Documents
+                    </div>
+                
                     <div class="chat-input-area">
                         <div class="input-wrapper">
                             <button class="attachment-btn" title="Attach context">
@@ -1218,8 +1539,13 @@
                 </div>
                 
                 <div class="chat-controls">
+                    <!-- 🎭 Persona Selector -->
+                    <div class="persona-selector" id="persona-selector">
+                        <!-- Persona buttons will be populated here -->
+                    </div>
+                    
                     <button class="btn-small" onclick="startNewConversation()">New Chat</button>
-                    <button class="btn-small" onclick="clearChatHistory()">Clear History</button>
+                    <button class="btn-small" onclick="clearCurrentPersonaHistory()">Clear History</button>
                 </div>
             </div>
         </div>
@@ -1308,12 +1634,17 @@
     </div>
 
     <script>
-        console.log('✅ Contract RAG Manager Started!');
+        console.log('✅ Covenantrix Started!');
         
         let contracts = [];
         let processingFiles = {};
         let currentConversationId = null;
         let isWaitingForResponse = false;
+        
+        // 🎭 Persona state
+        let currentPersona = null;
+        let availablePersonas = [];
+        let personaConversations = {}; // Store conversation IDs per persona
 
         // Settings Modal Functions
         function openSettingsModal() {
@@ -1341,8 +1672,221 @@
             }
         });
 
+        // 🎭 PERSONA MANAGEMENT FUNCTIONS
+
+        // Initialize personas on app start
+        async function initializePersonas() {
+            try {
+                // Load available personas
+                availablePersonas = await window.electronAPI.getAllPersonas();
+                
+                // Get current persona
+                currentPersona = await window.electronAPI.getCurrentPersona();
+                
+                // Initialize persona conversations storage
+                availablePersonas.forEach(persona => {
+                    if (!personaConversations[persona.id]) {
+                        personaConversations[persona.id] = null; // No active conversation initially
+                    }
+                });
+                
+                // Render persona selector
+                renderPersonaSelector();
+                
+                console.log(`🎭 Personas initialized. Current: ${currentPersona.name}`);
+            } catch (error) {
+                console.error('❌ Error initializing personas:', error);
+            }
+        }
+
+        // Render the persona selector buttons
+        function renderPersonaSelector() {
+            const selector = document.getElementById('persona-selector');
+            if (!selector || !availablePersonas.length) return;
+            
+            selector.innerHTML = availablePersonas.map(persona => `
+                <button 
+                    class="persona-btn ${persona.id === currentPersona.id ? 'active' : ''}" 
+                    onclick="switchToPersona('${persona.id}')"
+                    style="--persona-color: ${persona.color}; --persona-color-hover: ${persona.color}dd"
+                    title="${persona.description}"
+                >
+                    <span class="persona-icon">${persona.icon}</span>
+                    <span class="persona-name">${persona.name}</span>
+                </button>
+            `).join('');
+        }
+
+        // Switch to a different persona
+        async function switchToPersona(personaId) {
+            if (personaId === currentPersona.id) return; // Already active
+            
+            try {
+                // Save current conversation ID for current persona
+                if (currentConversationId) {
+                    personaConversations[currentPersona.id] = currentConversationId;
+                }
+                
+                // Switch persona in backend
+                const success = await window.electronAPI.switchPersona(personaId);
+                if (!success) {
+                    console.error('❌ Failed to switch persona');
+                    return;
+                }
+                
+                // Update current persona
+                const previousPersona = currentPersona;
+                currentPersona = availablePersonas.find(p => p.id === personaId);
+                
+                // Restore conversation for new persona or start fresh
+                currentConversationId = personaConversations[personaId] || null;
+                
+                // Update UI
+                renderPersonaSelector();
+                await loadPersonaConversationHistory();
+                
+                console.log(`🎭 Switched from ${previousPersona.name} to ${currentPersona.name}`);
+                
+                // Update chat header to show current persona
+                updateChatHeader();
+                
+            } catch (error) {
+                console.error('❌ Error switching persona:', error);
+                alert('Failed to switch persona. Please try again.');
+            }
+        }
+
+        // Load conversation history for current persona
+        async function loadPersonaConversationHistory() {
+            const messagesContainer = document.getElementById('chat-messages');
+            
+            if (!currentConversationId) {
+                // Clear chat and show welcome message
+                messagesContainer.innerHTML = `
+                    <div class="assistant-message welcome-message">
+                        <div class="message-avatar">AI</div>
+                        <div class="message-content">
+                            <p><strong>${currentPersona.icon} ${currentPersona.name}</strong></p>
+                            <p>Ready to analyze your contracts. I can help you understand legal documents through natural conversation.</p>
+                            <p><strong>Try asking:</strong></p>
+                            <ul style="margin: 8px 0; padding-left: 20px;">
+                                <li>Who are the parties in this agreement?</li>
+                                <li>What are the payment terms?</li>
+                                <li>When does this contract expire?</li>
+                                <li>What are the termination conditions?</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            } else {
+                try {
+                    // Load actual conversation history from backend
+                    const conversationHistory = await window.electronAPI.getConversationHistory(currentConversationId);
+                    
+                    // Clear messages container
+                    messagesContainer.innerHTML = '';
+                    
+                    // Add welcome message first
+                    messagesContainer.innerHTML = `
+                        <div class="assistant-message welcome-message">
+                            <div class="message-avatar">AI</div>
+                            <div class="message-content">
+                                <p><strong>${currentPersona.icon} ${currentPersona.name}</strong></p>
+                                <p>${currentPersona.description}</p>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Restore conversation messages if any exist
+                    if (conversationHistory && conversationHistory.length > 0) {
+                        // Process conversation history in pairs (user message, assistant response)
+                        for (let i = 0; i < conversationHistory.length; i += 2) {
+                            const userMessage = conversationHistory[i];
+                            const assistantMessage = conversationHistory[i + 1];
+                            
+                            if (userMessage && userMessage.role === 'user') {
+                                // Add user message
+                                addUserMessage(userMessage.content, false); // Don't scroll yet
+                            }
+                            
+                            if (assistantMessage && assistantMessage.role === 'assistant') {
+                                // Add assistant message
+                                addAssistantMessage(assistantMessage.content, [], 'general', false); // Don't scroll yet
+                            }
+                        }
+                        
+                        console.log(`🔄 Restored ${conversationHistory.length / 2} conversation exchanges for ${currentPersona.name}`);
+                    } else {
+                        // No actual conversation history, just show continuing message
+                        const continuingDiv = document.createElement('div');
+                        continuingDiv.className = 'assistant-message';
+                        continuingDiv.innerHTML = `
+                            <div class="message-avatar">AI</div>
+                            <div class="message-content">
+                                <p>Continuing our conversation. Feel free to ask any questions about your contracts.</p>
+                            </div>
+                        `;
+                        messagesContainer.appendChild(continuingDiv);
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Error loading conversation history:', error);
+                    
+                    // Fallback to welcome message
+                    messagesContainer.innerHTML = `
+                        <div class="assistant-message welcome-message">
+                            <div class="message-avatar">AI</div>
+                            <div class="message-content">
+                                <p><strong>${currentPersona.icon} ${currentPersona.name}</strong></p>
+                                <p>${currentPersona.description}</p>
+                                <p>Ready to continue our conversation. Feel free to ask any questions about your contracts.</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            scrollToBottom();
+        }
+
+        // Update chat header with current persona info
+        function updateChatHeader() {
+            const chatHeader = document.querySelector('.chat-header-new h2');
+            if (chatHeader && currentPersona) {
+                chatHeader.innerHTML = `${currentPersona.icon} Analysis Chat - ${currentPersona.name}`;
+            }
+        }
+
+        // Clear conversations for current persona only
+        async function clearCurrentPersonaHistory() {
+            const personaName = currentPersona ? currentPersona.name : 'current persona';
+            
+            if (confirm(`Are you sure you want to clear all chat history for ${personaName}? This action cannot be undone.`)) {
+                try {
+                    await window.electronAPI.clearCurrentPersonaConversations();
+                    
+                    // Clear current conversation ID for this persona
+                    if (currentPersona) {
+                        personaConversations[currentPersona.id] = null;
+                    }
+                    currentConversationId = null;
+                    
+                    // Reload conversation history (will show welcome message)
+                    await loadPersonaConversationHistory();
+                    
+                    console.log(`🗑️ Chat history cleared for ${personaName}`);
+                } catch (error) {
+                    console.error('Error clearing persona chat history:', error);
+                    alert('Error clearing chat history: ' + error.message);
+                }
+            }
+        }
+
         // Initialize the app
         async function initializeApp() {
+            // 📁 Load folders first
+            await loadFolders();
+            
             await loadExistingDocuments();
             setupDragAndDrop();
             setupProcessingListener();
@@ -1350,10 +1894,20 @@
             await loadApiKeyStatus();
             await loadOCRSettings();
             await updateStats();
+            
+            // 🎭 Initialize personas
+            await initializePersonas();
+            
+            // Initialize RAG context indicator
+            updateRAGContext();
         }
 
         // Load existing documents from storage
         async function loadExistingDocuments() {
+            return await loadContracts();
+        }
+
+        async function loadContracts() {
             try {
                 const documents = await window.electronAPI.getDocuments();
                 contracts = documents;
@@ -1584,8 +2138,37 @@
             }
         }
 
-        // VS Code-style file tree functions
-        let expandedFolders = new Set(['today', 'recent', 'older']);
+        // 📁 Folder-based file tree functions
+        let folders = [];
+        let expandedFolders = new Set(['all-documents']); // Start with default folder expanded
+        let selectedFolder = null; // Track selected folder for RAG context
+        let selectedDocument = null; // 🎯 NEW: Track selected document for RAG focus (highest priority)
+
+        async function loadFolders() {
+            try {
+                console.log('📂 Loading folders from backend...');
+                const result = await window.electronAPI.getFolders();
+                console.log('📂 Backend folders response:', result);
+                
+                if (result.success) {
+                    folders = result.folders;
+                    console.log('📂 Loaded', folders.length, 'folders:', folders.map(f => f.name));
+                    
+                    // Ensure default folder is expanded
+                    const defaultFolder = folders.find(f => f.isDefault);
+                    if (defaultFolder) {
+                        expandedFolders.add(defaultFolder.id);
+                        console.log('📂 Default folder expanded:', defaultFolder.name);
+                    }
+                } else {
+                    console.error('❌ Failed to load folders:', result.error);
+                    folders = [];
+                }
+            } catch (error) {
+                console.error('❌ Error loading folders:', error);
+                folders = [];
+            }
+        }
 
         function toggleFolder(folderId) {
             if (expandedFolders.has(folderId)) {
@@ -1596,34 +2179,91 @@
             updateFileTree();
         }
 
-        function groupDocumentsByDate(documents) {
-            const now = new Date();
-            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const weekAgo = new Date(today);
-            weekAgo.setDate(weekAgo.getDate() - 7);
+        function selectFolder(folderId) {
+            // Toggle folder selection (click to select/deselect folder for RAG focus)
+            selectedFolder = selectedFolder === folderId ? null : folderId;
+            
+            // Clear document selection when folder is selected (folder has lower priority)
+            if (selectedFolder) {
+                selectedDocument = null;
+            }
+            
+            updateFileTree();
+            updateRAGContext();
+        }
 
-            const groups = {
-                today: [],
-                recent: [],
-                older: []
-            };
+        // 🎯 NEW: Document focus selection (highest priority)
+        function selectDocument(documentId) {
+            // Toggle document selection (click to select/deselect document for RAG focus)
+            selectedDocument = selectedDocument === documentId ? null : documentId;
+            
+            // Clear folder selection when document is selected (document has higher priority)
+            if (selectedDocument) {
+                selectedFolder = null;
+            }
+            
+            updateFileTree();
+            updateRAGContext();
+        }
 
+        function updateRAGContext() {
+            const contextIndicator = document.getElementById('rag-context-indicator');
+            
+            if (selectedDocument && contextIndicator) {
+                // 🎯 Highest priority: Document focus
+                const document = contracts.find(doc => doc.id === selectedDocument);
+                contextIndicator.textContent = `🎯 Focus: "${document?.originalName || 'Unknown Document'}"`;
+                contextIndicator.style.display = 'block';
+                contextIndicator.style.background = 'rgba(255, 165, 0, 0.15)'; // Orange for document focus
+                contextIndicator.style.borderColor = 'rgba(255, 165, 0, 0.3)';
+                contextIndicator.style.color = '#000000'; // 🎯 BLACK text for better readability
+            } else if (selectedFolder && contextIndicator) {
+                // 📁 Medium priority: Folder focus
+                const folder = folders.find(f => f.id === selectedFolder);
+                contextIndicator.textContent = `🎯 Focus: ${folder?.name || 'Unknown Folder'}`;
+                contextIndicator.style.display = 'block';
+                contextIndicator.style.background = 'rgba(16, 185, 129, 0.1)'; // Green for folder focus
+                contextIndicator.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+                contextIndicator.style.color = '#10b981';
+            } else if (contextIndicator) {
+                // 📚 Default: All documents
+                contextIndicator.style.display = 'none';
+            }
+        }
+
+        function groupDocumentsByFolder(documents) {
+            console.log('📁 Grouping documents by folder...');
+            console.log('📁 Available folders:', folders);
+            console.log('📄 Documents to group:', documents);
+            
+            const folderGroups = {};
+            
+            // Initialize groups for all folders
+            folders.forEach(folder => {
+                folderGroups[folder.id] = {
+                    folder: folder,
+                    documents: []
+                };
+            });
+            console.log('📁 Initialized folder groups:', Object.keys(folderGroups));
+
+            // Group documents by their folder
             documents.forEach(doc => {
-                const docDate = new Date(doc.uploadedAt);
-                const docDateOnly = new Date(docDate.getFullYear(), docDate.getMonth(), docDate.getDate());
-                
-                if (docDateOnly.getTime() === today.getTime()) {
-                    groups.today.push(doc);
-                } else if (docDate >= weekAgo) {
-                    groups.recent.push(doc);
+                const folderId = doc.folderId || 'all-documents';
+                console.log(`📄 Document "${doc.originalName || doc.fileName}" assigned to folder: ${folderId}`);
+                if (folderGroups[folderId]) {
+                    folderGroups[folderId].documents.push(doc);
                 } else {
-                    groups.older.push(doc);
+                    console.log(`⚠️ Folder ${folderId} doesn't exist, moving to default`);
+                    // If folder doesn't exist, add to default folder
+                    if (folderGroups['all-documents']) {
+                        folderGroups['all-documents'].documents.push(doc);
+                    }
                 }
             });
 
-            return groups;
+            console.log('📁 Final folder groups:', folderGroups);
+            return folderGroups;
         }
 
         function getFileIcon(filename) {
@@ -1653,8 +2293,9 @@
             return 'PROC';
         }
 
-        // Update file tree
+        // Update file tree with folder-based organization
         function updateFileTree() {
+            console.log('🔄 updateFileTree() called, folders available:', folders.length);
             const fileTree = document.getElementById('file-tree');
             const deleteAllBtn = document.getElementById('delete-all-btn');
             
@@ -1664,25 +2305,54 @@
                 deleteAllBtn.style.display = 'none';
             }
 
-            const groups = groupDocumentsByDate([...contracts, ...Object.values(processingFiles)]);
+            const allDocuments = [...contracts, ...Object.values(processingFiles)];
+            const folderGroups = groupDocumentsByFolder(allDocuments);
             
             let html = '';
 
+            // Add folder management buttons
+            html += `
+                <div class="folder-controls">
+                    <button class="folder-control-btn" id="new-folder-btn" title="Create new folder">
+                        <span style="color: #10b981;">➕</span> New Folder
+                    </button>
+                    <button class="folder-control-btn" id="clear-folder-btn" title="Clear all focus (document and folder)">
+                        <span style="color: #6b7280;">🎯</span> All Docs
+                    </button>
+                </div>
+            `;
+
             // Helper function to create folder HTML
-            function createFolder(id, title, count, documents) {
-                if (count === 0) return '';
-                
-                const isExpanded = expandedFolders.has(id);
+            function createFolder(folderData) {
+                const { folder, documents } = folderData;
+                const isExpanded = expandedFolders.has(folder.id);
+                const isSelected = selectedFolder === folder.id;
                 const arrowClass = isExpanded ? 'expanded' : '';
                 const contentClass = isExpanded ? '' : 'collapsed';
+                const selectedClass = isSelected ? 'selected' : '';
+                
+                // Use folder color if available
+                const folderColor = folder.color || '#6366f1';
                 
                 html += `
-                    <div class="tree-folder" onclick="toggleFolder('${id}')">
-                        <div class="folder-arrow ${arrowClass}">▶</div>
-                        <div class="tree-icon">📁</div>
-                        <span class="file-name">${title} (${count})</span>
+                    <div class="tree-folder ${selectedClass}" data-folder-id="${folder.id}">
+                        <div class="folder-header">
+                            <div class="folder-arrow ${arrowClass}" data-action="toggle-folder" data-folder-id="${folder.id}">▶</div>
+                            <div class="tree-icon" style="color: ${folderColor};">📁</div>
+                            <span class="file-name" data-action="select-folder" data-folder-id="${folder.id}">${folder.name} (${documents.length})</span>
+                            <div class="folder-actions">
+                                ${!folder.isDefault ? `
+                                    <button class="folder-action-btn edit" data-action="edit-folder" data-folder-id="${folder.id}" title="Edit folder">
+                                        ✏️
+                                    </button>
+                                    <button class="folder-action-btn delete" data-action="delete-folder" data-folder-id="${folder.id}" title="Delete folder">
+                                        🗑️
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
                     </div>
-                    <div class="tree-folder-content ${contentClass}" id="folder-${id}">
+                    <div class="tree-folder-content ${contentClass}" id="folder-${folder.id}">
                 `;
 
                 documents.forEach(doc => {
@@ -1691,18 +2361,31 @@
                     const statusClass = isProcessing ? 'processing' : getStatusClass(doc);
                     const statusText = isProcessing ? 'PROC' : getStatusText(doc);
                     
+                    // 🎯 Check if this document is selected for focus
+                    const isDocumentSelected = selectedDocument === doc.id;
+                    const documentSelectedClass = isDocumentSelected ? 'document-focused' : '';
+                    
                     html += `
-                        <div class="tree-file" title="${doc.originalName || doc.fileName}">
+                        <div class="tree-file ${documentSelectedClass}" title="${doc.originalName || doc.fileName}" draggable="true" data-doc-id="${doc.id}">
                             <div class="tree-icon">${icon}</div>
-                            <span class="file-name">${doc.originalName || doc.fileName}</span>
-                            <span class="file-status ${statusClass}">${statusText}</span>
+                            <span class="file-name" data-action="select-document" data-doc-id="${doc.id}">${doc.originalName || doc.fileName}</span>
                             ${!isProcessing ? `
                                 <div class="file-actions">
-                                    <button class="file-action-btn delete" onclick="deleteDocument('${doc.id}', '${doc.originalName}')" title="Delete">
+                                    <button class="file-action-btn focus ${isDocumentSelected ? 'focused' : ''}" data-action="select-document" data-doc-id="${doc.id}" title="${isDocumentSelected ? 'Clear document focus' : 'Focus RAG on this document'}">
+                                        🎯
+                                    </button>
+                                    <button class="file-action-btn move" data-action="move-document" data-doc-id="${doc.id}" data-doc-name="${doc.originalName}" title="Move to folder">
+                                        📁
+                                    </button>
+                                    <button class="file-action-btn delete" data-action="delete-document" data-doc-id="${doc.id}" data-doc-name="${doc.originalName}" title="Delete">
                                         ×
                                     </button>
                                 </div>
-                            ` : ''}
+                            ` : `
+                                <div class="file-actions">
+                                    <span class="file-status ${statusClass}">${statusText}</span>
+                                </div>
+                            `}
                         </div>
                     `;
                 });
@@ -1710,14 +2393,22 @@
                 html += '</div>';
             }
 
-            // Create folders
-            createFolder('today', 'Today', groups.today.length, groups.today);
-            createFolder('recent', 'Recent', groups.recent.length, groups.recent);
-            createFolder('older', 'Older', groups.older.length, groups.older);
+            // Create folders (only show folders with documents or if it's the default folder)
+            console.log('📁 Rendering folders...');
+            Object.values(folderGroups).forEach(folderData => {
+                const { folder, documents } = folderData;
+                console.log(`📁 Checking folder "${folder.name}" - documents: ${documents.length}, isDefault: ${folder.isDefault}`);
+                if (documents.length > 0 || folder.isDefault) {
+                    console.log(`📁 ✅ Rendering folder: ${folder.name}`);
+                    createFolder(folderData);
+                } else {
+                    console.log(`📁 ❌ Skipping empty folder: ${folder.name}`);
+                }
+            });
 
             // Show empty state if no documents
             if (contracts.length === 0 && Object.keys(processingFiles).length === 0) {
-                html = `
+                html += `
                     <div style="padding: 32px; text-align: center; color: #888;">
                         <div style="font-size: 24px; margin-bottom: 8px;">📄</div>
                         <div style="font-size: 13px;">No documents uploaded</div>
@@ -1727,11 +2418,399 @@
             }
 
             fileTree.innerHTML = html;
+            console.log('📄 HTML inserted, setting up event listeners...'); // Debug log
+            
+            // Set up event listeners after HTML is inserted
+            setupFolderEventListeners();
+        }
+
+        // Set up event listeners for folder and document actions
+        function setupFolderEventListeners() {
+            const fileTree = document.getElementById('file-tree');
+            if (!fileTree) return;
+
+            // Remove existing event listeners to prevent duplicates
+            fileTree.removeEventListener('click', handleFolderTreeClick);
+            
+            // Add single event listener using event delegation
+            fileTree.addEventListener('click', handleFolderTreeClick);
+            
+            // Also set up folder control button listeners
+            setupFolderControlListeners();
+        }
+
+        // Handle all clicks in the folder tree using event delegation
+        function handleFolderTreeClick(event) {
+            const target = event.target;
+            const action = target.getAttribute('data-action');
+            
+            if (!action) return;
+
+            // Prevent default for all our actions
+            event.preventDefault();
+            event.stopPropagation();
+
+            const folderId = target.getAttribute('data-folder-id');
+            const docId = target.getAttribute('data-doc-id');
+            const docName = target.getAttribute('data-doc-name');
+
+            switch (action) {
+                case 'toggle-folder':
+                    if (folderId) toggleFolder(folderId);
+                    break;
+                case 'select-folder':
+                    if (folderId) selectFolder(folderId);
+                    break;
+                case 'select-document':
+                    if (docId) selectDocument(docId);
+                    break;
+                case 'edit-folder':
+                    if (folderId) editFolder(folderId);
+                    break;
+                case 'delete-folder':
+                    if (folderId) deleteFolder(folderId);
+                    break;
+                case 'move-document':
+                    if (docId && docName) showMoveDocumentDialog(docId, docName);
+                    break;
+                case 'delete-document':
+                    if (docId && docName) deleteDocument(docId, docName);
+                    break;
+            }
+        }
+
+        // Set up folder control button listeners
+        function setupFolderControlListeners() {
+            console.log('🎛️ Setting up folder control listeners...');
+            
+            // New Folder button
+            const newFolderBtn = document.getElementById('new-folder-btn');
+            console.log('🔍 Looking for new-folder-btn:', newFolderBtn);
+            if (newFolderBtn) {
+                console.log('✅ Found new-folder-btn, attaching event listener');
+                newFolderBtn.removeEventListener('click', createNewFolder);
+                newFolderBtn.addEventListener('click', (e) => {
+                    console.log('🎯 New folder button click event fired!');
+                    e.preventDefault();
+                    createNewFolder();
+                });
+                console.log('✅ Event listener attached to new-folder-btn');
+            } else {
+                console.error('❌ new-folder-btn not found in DOM!');
+            }
+
+            // Clear All Focus button (document and folder)
+            const clearFolderBtn = document.getElementById('clear-folder-btn');
+            console.log('🔍 Looking for clear-folder-btn:', clearFolderBtn);
+            if (clearFolderBtn) {
+                console.log('✅ Found clear-folder-btn, attaching event listener');
+                clearFolderBtn.removeEventListener('click', clearAllFocus);
+                clearFolderBtn.addEventListener('click', clearAllFocus);
+            } else {
+                console.error('❌ clear-folder-btn not found in DOM!');
+            }
         }
 
         // Update contracts list (renamed for compatibility)
         function updateContractsList() {
             updateFileTree();
+        }
+
+        // 📁 FOLDER MANAGEMENT FUNCTIONS
+
+        function clearFolderSelection() {
+            selectedFolder = null;
+            selectedDocument = null; // Also clear document focus
+            updateFileTree();
+            updateRAGContext();
+        }
+
+        // 🎯 NEW: Clear all focus (both document and folder)
+        function clearAllFocus() {
+            selectedFolder = null;
+            selectedDocument = null;
+            updateFileTree();
+            updateRAGContext();
+        }
+
+        async function createNewFolder() {
+            console.log('🆕 Create New Folder button clicked!');
+            showCreateFolderDialog();
+        }
+
+        function showCreateFolderDialog() {
+            // Create modal dialog to replace prompt()
+            const dialog = document.createElement('div');
+            dialog.innerHTML = `
+                <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center;">
+                    <div style="background: #2b2d31; padding: 24px; border-radius: 12px; min-width: 400px; border: 1px solid #404249;">
+                        <h3 style="margin: 0 0 16px 0; color: #f2f3f5; font-size: 18px;">Create New Folder</h3>
+                        <p style="margin: 0 0 16px 0; color: #b5bac1; font-size: 14px;">Enter a name for your new folder:</p>
+                        <input type="text" id="folder-name-input" placeholder="Folder name..." style="
+                            width: 100%; 
+                            padding: 12px; 
+                            margin: 0 0 20px 0; 
+                            border: 1px solid #4f545c; 
+                            border-radius: 6px; 
+                            background: #383a40; 
+                            color: #f2f3f5; 
+                            font-size: 14px;
+                            box-sizing: border-box;
+                            outline: none;
+                        ">
+                        <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                            <button id="dialog-cancel-create" style="
+                                padding: 10px 20px; 
+                                background: #4f545c; 
+                                color: #f2f3f5; 
+                                border: none; 
+                                border-radius: 6px; 
+                                cursor: pointer; 
+                                font-size: 14px;
+                                transition: background 0.2s;
+                            " onmouseover="this.style.background='#5d6269'" onmouseout="this.style.background='#4f545c'">Cancel</button>
+                            <button id="dialog-create-folder" style="
+                                padding: 10px 20px; 
+                                background: #5865f2; 
+                                color: white; 
+                                border: none; 
+                                border-radius: 6px; 
+                                cursor: pointer; 
+                                font-size: 14px;
+                                transition: background 0.2s;
+                            " onmouseover="this.style.background='#4752c4'" onmouseout="this.style.background='#5865f2'">Create Folder</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(dialog);
+            
+            // Focus input field
+            const input = document.getElementById('folder-name-input');
+            input.focus();
+            
+            // Set up event listeners
+            const cancelBtn = document.getElementById('dialog-cancel-create');
+            const createBtn = document.getElementById('dialog-create-folder');
+            
+            const closeDialog = () => {
+                dialog.remove();
+            };
+            
+            const handleCreate = async () => {
+                const name = input.value.trim();
+                console.log('📝 User entered name:', name);
+                if (name) {
+                    console.log('✅ Creating folder with name:', name);
+                    closeDialog();
+                    try {
+                        await createFolder(name);
+                    } catch (error) {
+                        console.error('❌ Error creating folder:', error);
+                        alert('Error creating folder. Please try again.');
+                    }
+                } else {
+                    console.log('❌ No valid name entered');
+                    input.focus();
+                    input.style.borderColor = '#ed4245';
+                    setTimeout(() => {
+                        input.style.borderColor = '#4f545c';
+                    }, 2000);
+                }
+            };
+            
+            cancelBtn.addEventListener('click', closeDialog);
+            createBtn.addEventListener('click', handleCreate);
+            
+            // Enter key submits
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleCreate();
+                }
+            });
+            
+            // Escape key cancels
+            document.addEventListener('keydown', function escapeHandler(e) {
+                if (e.key === 'Escape') {
+                    closeDialog();
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            });
+            
+            // Close on backdrop click
+            dialog.addEventListener('click', (e) => {
+                if (e.target === dialog) {
+                    closeDialog();
+                }
+            });
+        }
+
+        async function createFolder(name, options = {}) {
+            try {
+                console.log('📡 Calling window.electronAPI.createFolder...');
+                const result = await window.electronAPI.createFolder(name, options);
+                console.log('📡 Backend response:', result);
+                
+                if (result.success) {
+                    console.log('✅ Folder created successfully:', result.folder.name);
+                    
+                    // Reload folders and update UI
+                    await loadFolders();
+                    updateFileTree();
+                    
+                    // Expand the new folder
+                    expandedFolders.add(result.folder.id);
+                    updateFileTree(); // Update again to show expanded state
+                    
+                    console.log('✅ UI updated with new folder');
+                } else {
+                    console.error('❌ Backend returned error:', result.error);
+                    alert(`Failed to create folder: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('❌ Error in createFolder:', error);
+                alert('Error creating folder. Please try again.');
+            }
+        }
+
+        function editFolder(folderId) {
+            const folder = folders.find(f => f.id === folderId);
+            if (!folder) return;
+
+            const newName = prompt('Edit folder name:', folder.name);
+            if (newName && newName.trim() !== folder.name) {
+                updateFolder(folderId, { name: newName.trim() });
+            }
+        }
+
+        async function updateFolder(folderId, updates) {
+            try {
+                const result = await window.electronAPI.updateFolder(folderId, updates);
+                if (result.success) {
+                    console.log('✅ Folder updated:', result.folder.name);
+                    await loadFolders();
+                    updateFileTree();
+                } else {
+                    alert(`Failed to update folder: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Error updating folder:', error);
+                alert('Error updating folder. Please try again.');
+            }
+        }
+
+        function deleteFolder(folderId) {
+            const folder = folders.find(f => f.id === folderId);
+            if (!folder) return;
+
+            const docCount = folder.documentCount || 0;
+            
+            const message = docCount > 0 
+                ? `Delete folder "${folder.name}" and move ${docCount} document(s) to "All Documents"?`
+                : `Delete empty folder "${folder.name}"?`;
+
+            if (confirm(message)) {
+                performDeleteFolder(folderId);
+            }
+        }
+
+        async function performDeleteFolder(folderId) {
+            try {
+                const result = await window.electronAPI.deleteFolder(folderId);
+                if (result.success) {
+                    console.log('✅ Folder deleted:', result.deletedFolder);
+                    if (result.movedDocuments > 0) {
+                        console.log(`📁 Moved ${result.movedDocuments} documents to default folder`);
+                    }
+                    
+                    // Clear selection if deleted folder was selected
+                    if (selectedFolder === folderId) {
+                        selectedFolder = null;
+                        updateRAGContext();
+                    }
+                    
+                    await loadFolders();
+                    await loadContracts(); // Reload documents to show updated folder assignments
+                    updateFileTree();
+                } else {
+                    alert(`Failed to delete folder: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Error deleting folder:', error);
+                alert('Error deleting folder. Please try again.');
+            }
+        }
+
+        function showMoveDocumentDialog(documentId, documentName) {
+            const availableFolders = folders.filter(f => f.id !== 'processing'); // Exclude any processing folders
+            
+            if (availableFolders.length <= 1) {
+                alert('No other folders available. Create a folder first.');
+                return;
+            }
+
+            let optionsHtml = '';
+            availableFolders.forEach(folder => {
+                optionsHtml += `<option value="${folder.id}">${folder.name}</option>`;
+            });
+
+            const dialog = document.createElement('div');
+            dialog.innerHTML = `
+                <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;">
+                    <div style="background: white; padding: 20px; border-radius: 8px; min-width: 300px;">
+                        <h3>Move Document</h3>
+                        <p>Move "${documentName}" to:</p>
+                        <select id="folder-select" style="width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px;">
+                            ${optionsHtml}
+                        </select>
+                        <div style="text-align: right; margin-top: 15px;">
+                            <button id="dialog-cancel-btn" style="margin-right: 10px; padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+                            <button id="dialog-move-btn" data-doc-id="${documentId}" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">Move</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(dialog);
+            
+            // Set up dialog event listeners
+            const cancelBtn = dialog.querySelector('#dialog-cancel-btn');
+            const moveBtn = dialog.querySelector('#dialog-move-btn');
+            
+            cancelBtn.addEventListener('click', () => {
+                dialog.remove();
+            });
+            
+            moveBtn.addEventListener('click', () => {
+                const selectedFolderId = document.getElementById('folder-select').value;
+                moveDocument(documentId, selectedFolderId);
+                dialog.remove();
+            });
+            
+            // Close dialog on backdrop click
+            dialog.addEventListener('click', (e) => {
+                if (e.target === dialog) {
+                    dialog.remove();
+                }
+            });
+        }
+
+        async function moveDocument(documentId, targetFolderId) {
+            try {
+                const result = await window.electronAPI.moveDocumentToFolder(documentId, targetFolderId);
+                if (result.success) {
+                    console.log('✅ Document moved:', result.document.originalName);
+                    await loadContracts(); // Reload documents to show updated folder assignment
+                    await loadFolders(); // Reload folders to update document counts
+                    updateFileTree();
+                } else {
+                    alert(`Failed to move document: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Error moving document:', error);
+                alert('Error moving document. Please try again.');
+            }
         }
 
         // Chat functionality
@@ -1756,15 +2835,37 @@
                 // Generate conversation ID if needed
                 if (!currentConversationId) {
                     currentConversationId = await window.electronAPI.generateConversationId();
+                    
+                    // Update persona conversation tracking
+                    if (currentPersona) {
+                        personaConversations[currentPersona.id] = currentConversationId;
+                        console.log(`💬 New conversation started for ${currentPersona.name}: ${currentConversationId}`);
+                    }
                 }
                 
-                // Send RAG query
-                console.log(`💬 Sending message: "${query}"`);
-                const response = await window.electronAPI.ragQuery(query, currentConversationId, {
+                // Send RAG query (with optional folder filtering)
+                const ragOptions = {
                     maxResults: 5,
                     useConversationContext: true,
                     searchType: 'hybrid'
-                });
+                };
+                
+                // 🎯 Priority-based filtering: Document > Folder > All
+                if (selectedDocument) {
+                    // 🎯 Highest priority: Document focus
+                    ragOptions.documentId = selectedDocument;
+                    const docName = contracts.find(doc => doc.id === selectedDocument)?.originalName || 'Unknown';
+                    console.log(`💬 Sending document-focused message: "${query}" [🎯 Document: "${docName}"]`);
+                } else if (selectedFolder) {
+                    // 📁 Medium priority: Folder focus  
+                    ragOptions.folderId = selectedFolder;
+                    console.log(`💬 Sending folder-focused message: "${query}" [📁 Folder: ${selectedFolder}]`);
+                } else {
+                    // 📚 Default: All documents
+                    console.log(`💬 Sending message: "${query}" [📚 All Documents]`);
+                }
+                
+                const response = await window.electronAPI.ragQuery(query, currentConversationId, ragOptions);
                 
                 // Remove typing indicator
                 removeTypingIndicator(typingId);
@@ -1792,7 +2893,7 @@
             input.focus();
         }
 
-        function addUserMessage(text) {
+        function addUserMessage(text, shouldScroll = true) {
             const messagesContainer = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
             const textDirection = detectTextDirection(text);
@@ -1805,10 +2906,12 @@
                 </div>
             `;
             messagesContainer.appendChild(messageDiv);
-            scrollToBottom();
+            if (shouldScroll) {
+                scrollToBottom();
+            }
         }
 
-        function addAssistantMessage(text, sources = [], queryType = 'general') {
+        function addAssistantMessage(text, sources = [], queryType = 'general', shouldScroll = true) {
             const messagesContainer = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
             const textDirection = detectTextDirection(text);
@@ -1837,7 +2940,9 @@
                 </div>
             `;
             messagesContainer.appendChild(messageDiv);
-            scrollToBottom();
+            if (shouldScroll) {
+                scrollToBottom();
+            }
         }
 
         function showTypingIndicator() {
@@ -1880,31 +2985,29 @@
         }
 
         async function startNewConversation() {
-            currentConversationId = null;
-            const messagesContainer = document.getElementById('chat-messages');
-            
-            // Clear all messages except welcome message
-            const welcomeMessage = messagesContainer.querySelector('.welcome-message');
-            messagesContainer.innerHTML = '';
-            if (welcomeMessage) {
-                messagesContainer.appendChild(welcomeMessage);
+            // Clear current conversation for this persona
+            if (currentPersona) {
+                personaConversations[currentPersona.id] = null;
             }
+            currentConversationId = null;
             
-            console.log('🆕 Started new conversation');
-        }
-
-        async function clearChatHistory() {
-            if (confirm('Are you sure you want to clear all chat history? This action cannot be undone.')) {
-                try {
-                    await window.electronAPI.clearAllConversations();
-                    await startNewConversation();
-                    console.log('🗑️ Chat history cleared');
-            } catch (error) {
-                    console.error('Error clearing chat history:', error);
-                    alert('Error clearing chat history: ' + error.message);
+            // Reload persona conversation history (will show welcome message)
+            if (currentPersona) {
+                await loadPersonaConversationHistory();
+            } else {
+                // Fallback if personas not initialized yet
+                const messagesContainer = document.getElementById('chat-messages');
+                const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+                messagesContainer.innerHTML = '';
+                if (welcomeMessage) {
+                    messagesContainer.appendChild(welcomeMessage);
                 }
             }
+            
+            console.log('🆕 Started new conversation for current persona');
         }
+
+        // Legacy function - now using clearCurrentPersonaHistory for persona-aware clearing
 
         function formatMessageText(text) {
             // Simple formatting for better readability

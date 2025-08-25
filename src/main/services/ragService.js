@@ -2,6 +2,7 @@ const OpenAI = require('openai');
 const Store = require('electron-store');
 const VectorService = require('./vectorService');
 const DocumentService = require('./documentService');
+const PersonaService = require('./personaService');
 
 class RAGService {
   constructor(vectorService = null, documentService = null) {
@@ -10,6 +11,7 @@ class RAGService {
     // Use injected services or create new ones (backward compatibility)
     this.vectorService = vectorService || new VectorService();
     this.documentService = documentService || new DocumentService();
+    this.personaService = new PersonaService();
     
     // Settings store for configurations
     this.settingsStore = new Store({
@@ -17,7 +19,7 @@ class RAGService {
       encryptionKey: 'covenantrix-settings-key-v1'
     });
 
-    // Conversation store for chat history
+    // Conversation store for chat history - now organized by persona
     this.conversationStore = new Store({
       name: 'conversations',
       encryptionKey: 'covenantrix-conversations-key-v1'
@@ -30,6 +32,9 @@ class RAGService {
   async initialize() {
     try {
       await this.vectorService.initialize();
+      
+      // Initialize PersonaService from saved settings
+      this.personaService.initializeFromSettings();
       
       // Initialize OpenAI if API key exists
       const apiKey = this.settingsStore.get('openai_api_key');
@@ -59,54 +64,10 @@ class RAGService {
     }
   }
 
-  // Generate optimized contract-aware prompts based on query type
+  // Generate optimized contract-aware prompts based on query type and current persona
   generatePrompt(query, context, queryType = 'general') {
-    const baseInstructions = `You are Covenantrix, expert legal analyst for contract analysis.
-
-LANGUAGE: Respond in the SAME language as the user's query. Maintain their formality level.
-
-ANALYSIS FRAMEWORK: 1) IDENTIFY provision type 2) INTERPRET meaning 3) ANALYZE implications 4) ASSESS risks/ambiguities 5) CITE sources
-
-INSTRUCTIONS:
-- Base analysis ONLY on provided document context
-- State clearly if information missing from documents  
-- Cite specific document sections with precision
-- Preserve Hebrew/Arabic text direction when quoting
-- Focus on practical, actionable legal insights
-- Highlight risks and important considerations
-- State limitations when uncertain
-
-`;
-
-    const querySpecificInstructions = {
-      'general': 'Apply framework comprehensively. Focus on practical implications.',
-      'parties': 'Identify parties, capacity, roles. Analyze relationships and obligations.',
-      'terms': 'Identify key terms. Interpret meaning. Analyze enforceability.',
-      'dates': 'Identify dates/deadlines. Analyze time obligations. Assess compliance risks.',
-      'liability': 'Analyze liability allocation. Identify risk distribution. Assess scope.',
-      'termination': 'Analyze termination triggers. Identify notice requirements. Assess post-termination duties.',
-      'payment': 'Analyze payment terms. Identify penalties. Assess dispute resolution.',
-      'confidentiality': 'Analyze confidentiality scope. Identify exceptions. Assess enforcement.',
-      'interpretation': 'Interpret ambiguous provisions. Analyze meanings. Assess legal soundness.',
-      'enforceability': 'Analyze binding nature. Identify enforceability issues. Assess remedies.',
-      'compliance': 'Identify compliance requirements. Analyze obligations. Assess non-compliance risks.',
-      'risk_assessment': 'Identify legal/business risks. Analyze impact. Assess mitigation strategies.',
-      'amendment': 'Analyze amendment procedures. Identify modification requirements.',
-      'breach': 'Identify breach scenarios. Analyze consequences. Assess notice/cure requirements.'
-    };
-
-    const instruction = querySpecificInstructions[queryType] || querySpecificInstructions['general'];
-
-    return `${baseInstructions}
-
-TASK: ${instruction}
-
-CONTEXT:
-${context}
-
-QUERY: ${query}
-
-RESPONSE:`;
+    // Use PersonaService to generate persona-specific prompt
+    return this.personaService.generatePersonaPrompt(query, context, queryType);
   }
 
   // Alternative minimal prompt for high-confidence scenarios
@@ -600,17 +561,37 @@ Analysis:`;
       const {
         maxResults = 5,
         useConversationContext = true,
-        searchType = 'hybrid'
+        searchType = 'hybrid',
+        folderId = null, // Optional folder filtering
+        documentId = null // 🎯 NEW: Optional document filtering (highest priority)
       } = options;
 
-      console.log(`🤖 RAG Query: "${query}"`);
+      // Priority logging: Document > Folder > All
+      if (documentId) {
+        console.log(`🤖 RAG Query: "${query}" [🎯 Document: ${documentId}]`);
+      } else if (folderId) {
+        console.log(`🤖 RAG Query: "${query}" [📁 Folder: ${folderId}]`);
+      } else {
+        console.log(`🤖 RAG Query: "${query}" [📚 All Documents]`);
+      }
 
       // Step 1: Detect query language for multilingual support
       const queryLanguage = this.detectQueryLanguage(query);
       console.log(`🌍 Detected query language: ${queryLanguage}`);
 
-      // Step 2: Retrieve relevant context using existing search
-      const searchResults = await this.documentService.searchDocuments(query, searchType);
+      // Step 2: Retrieve relevant context with priority filtering
+      // Priority: Document focus > Folder focus > All documents
+      let searchResults;
+      if (documentId) {
+        // 🎯 Highest priority: Search within specific document
+        searchResults = await this.documentService.searchInDocument(query, documentId, searchType);
+      } else if (folderId) {
+        // 📁 Medium priority: Search within specific folder
+        searchResults = await this.documentService.searchDocumentsInFolder(query, folderId, searchType);
+      } else {
+        // 📚 Default: Search all documents
+        searchResults = await this.documentService.searchDocuments(query, searchType);
+      }
       
       if (searchResults.length === 0) {
         // Return language-appropriate "no results" message
@@ -700,6 +681,12 @@ Analysis:`;
         confidence: confidenceScore,
         tokenUsage: tokenUsage,
         
+        // 🎯 Context metadata (priority: document > folder > all)
+        documentId: documentId, // Highest priority context
+        documentName: documentId ? this.documentService.getDocument(documentId)?.originalName : null,
+        folderId: !documentId ? folderId : null, // Only show folder if no document focus
+        folderName: (!documentId && folderId) ? this.documentService.folderService.getFolder(folderId)?.name : null,
+        
         // 🚀 NEW: Contract Intelligence Features
         contractIntelligence: {
           contractType: contractType,
@@ -740,10 +727,12 @@ Analysis:`;
   saveConversationTurn(conversationId, query, response, sources) {
     try {
       const conversations = this.conversationStore.get('conversations', {});
+      const currentPersona = this.personaService.getCurrentPersona();
       
       if (!conversations[conversationId]) {
         conversations[conversationId] = {
           id: conversationId,
+          persona: currentPersona, // Associate conversation with persona
           created: new Date().toISOString(),
           messages: []
         };
@@ -781,8 +770,12 @@ Analysis:`;
     try {
       const conversations = this.conversationStore.get('conversations', {});
       const conversation = conversations[conversationId];
+      const currentPersona = this.personaService.getCurrentPersona();
       
-      if (!conversation) return [];
+      // Only return history if conversation belongs to current persona
+      if (!conversation || (conversation.persona && conversation.persona !== currentPersona)) {
+        return [];
+      }
 
       // Convert to OpenAI message format
       const messages = [];
@@ -801,10 +794,14 @@ Analysis:`;
   getAllConversations() {
     try {
       const conversations = this.conversationStore.get('conversations', {});
+      const currentPersona = this.personaService.getCurrentPersona();
+      
       return Object.values(conversations)
+        .filter(conv => !conv.persona || conv.persona === currentPersona) // Filter by current persona
         .sort((a, b) => new Date(b.updated) - new Date(a.updated))
         .map(conv => ({
           id: conv.id,
+          persona: conv.persona || 'legacy',
           created: conv.created,
           updated: conv.updated,
           messageCount: conv.messages.length,
@@ -837,6 +834,50 @@ Analysis:`;
       return true;
     } catch (error) {
       console.error('❌ Error clearing conversations:', error);
+      return false;
+    }
+  }
+
+  // 🎭 PERSONA MANAGEMENT METHODS
+
+  // Get current persona information
+  getCurrentPersona() {
+    return this.personaService.getCurrentPersonaDefinition();
+  }
+
+  // Get all available personas
+  getAllPersonas() {
+    return this.personaService.getAllPersonas();
+  }
+
+  // Switch to a different persona
+  switchPersona(personaId) {
+    const success = this.personaService.switchPersona(personaId);
+    if (success) {
+      console.log(`🎭 RAGService: Switched to ${personaId} persona`);
+    }
+    return success;
+  }
+
+  // Clear conversations for current persona only
+  clearCurrentPersonaConversations() {
+    try {
+      const conversations = this.conversationStore.get('conversations', {});
+      const currentPersona = this.personaService.getCurrentPersona();
+      
+      // Remove conversations for current persona
+      const updatedConversations = {};
+      for (const [convId, conv] of Object.entries(conversations)) {
+        if (!conv.persona || conv.persona !== currentPersona) {
+          updatedConversations[convId] = conv;
+        }
+      }
+      
+      this.conversationStore.set('conversations', updatedConversations);
+      console.log(`🗑️ Cleared conversations for persona: ${currentPersona}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Error clearing persona conversations:', error);
       return false;
     }
   }
@@ -935,6 +976,74 @@ Analysis:`;
         totalDocuments: 0
       };
     }
+  }
+
+  // 📁 FOLDER MANAGEMENT METHODS (Passthrough to DocumentService)
+
+  // Get all folders with document counts
+  getAllFolders() {
+    return this.documentService.getAllFolders();
+  }
+
+  // Create new folder
+  createFolder(name, options = {}) {
+    return this.documentService.createFolder(name, options);
+  }
+
+  // Update folder
+  updateFolder(folderId, updates) {
+    return this.documentService.updateFolder(folderId, updates);
+  }
+
+  // Delete folder
+  deleteFolder(folderId, targetFolderId = null) {
+    return this.documentService.deleteFolder(folderId, targetFolderId);
+  }
+
+  // Move document to folder
+  moveDocumentToFolder(documentId, targetFolderId) {
+    return this.documentService.moveDocumentToFolder(documentId, targetFolderId);
+  }
+
+  // Get documents in specific folder
+  getDocumentsByFolder(folderId) {
+    return this.documentService.getDocumentsByFolder(folderId);
+  }
+
+  // Get folder statistics
+  getFolderStatistics() {
+    return this.documentService.getFolderStatistics();
+  }
+
+  // Search documents within specific folder
+  async searchDocumentsInFolder(query, folderId, searchType = 'hybrid') {
+    return await this.documentService.searchDocumentsInFolder(query, folderId, searchType);
+  }
+
+  // 🎯 NEW: Search within specific document
+  async searchInDocument(query, documentId, searchType = 'hybrid') {
+    return await this.documentService.searchInDocument(query, documentId, searchType);
+  }
+
+  // Query documents with folder context (enhanced version)
+  async queryDocumentsInFolder(query, folderId, conversationId = null, options = {}) {
+    return await this.queryDocuments(query, conversationId, { 
+      ...options, 
+      folderId: folderId 
+    });
+  }
+
+  // 🎯 NEW: Query documents with document focus (highest priority)
+  async queryDocument(query, documentId, conversationId = null, options = {}) {
+    return await this.queryDocuments(query, conversationId, { 
+      ...options, 
+      documentId: documentId 
+    });
+  }
+
+  // Migrate existing documents to folders
+  migrateDocumentsToFolders() {
+    return this.documentService.migrateDocumentsToFolders();
   }
 }
 

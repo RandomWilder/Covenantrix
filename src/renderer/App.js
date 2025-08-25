@@ -53,8 +53,8 @@ const App = () => {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Contract RAG Manager</h1>
-        <span className="version">v1.2.10</span>
+        <h1>Covenantrix</h1>
+        <span className="version">v1.2.11</span>
       </header>
 
       <div className="main-content">

@@ -5,9 +5,10 @@ const Store = require('electron-store');
 const { v4: uuidv4 } = require('uuid');
 const VectorService = require('./vectorService');
 const OCRService = require('./ocrService');
+const FolderService = require('./folderService');
 
 class DocumentService {
-  constructor(vectorService = null, ocrService = null) {
+  constructor(vectorService = null, ocrService = null, folderService = null) {
     // Initialize secure storage for documents metadata
     this.store = new Store({
       name: 'documents',
@@ -22,6 +23,7 @@ class DocumentService {
     // Use injected services or create new ones (backward compatibility)
     this.vectorService = vectorService || new VectorService();
     this.ocrService = ocrService || new OCRService();
+    this.folderService = folderService || new FolderService();
     
     // Initialize vector service
     this.initializeServices();
@@ -47,9 +49,14 @@ class DocumentService {
     }
   }
 
-  async processDocument(filePath, fileName, progressCallback = null) {
+  async processDocument(filePath, fileName, progressCallback = null, folderId = null) {
     const documentId = uuidv4();
     console.log(`🔄 Processing document: ${fileName} (ID: ${documentId})`);
+    
+    // Validate folder or use default
+    const targetFolderId = folderId && this.folderService.validateFolder(folderId) 
+      ? folderId 
+      : this.folderService.getDefaultFolderId();
     
     // Progress tracking setup
     const startTime = Date.now();
@@ -119,7 +126,9 @@ class DocumentService {
         fileType: fileExt,
         status: 'processing',
         processingSteps: [],
-        hasUnicodeFilename: hasUnicodeChars
+        hasUnicodeFilename: hasUnicodeChars,
+        folderId: targetFolderId,
+        folderName: this.folderService.getFolder(targetFolderId)?.name || 'All Documents'
       };
 
       // Extract text based on file type
@@ -971,6 +980,225 @@ class DocumentService {
     const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'];
     const ext = path.extname(fileName).toLowerCase();
     return imageExtensions.includes(ext);
+  }
+
+  // 📁 FOLDER MANAGEMENT METHODS
+
+  // Get documents by folder ID
+  getDocumentsByFolder(folderId) {
+    const documents = this.getAllDocuments();
+    return documents.filter(doc => 
+      (doc.folderId || this.folderService.getDefaultFolderId()) === folderId
+    );
+  }
+
+  // Move document to different folder
+  moveDocumentToFolder(documentId, targetFolderId) {
+    try {
+      // Validate target folder
+      if (!this.folderService.validateFolder(targetFolderId)) {
+        throw new Error('Target folder does not exist');
+      }
+
+      const documents = this.getAllDocuments();
+      const docIndex = documents.findIndex(doc => doc.id === documentId);
+      
+      if (docIndex === -1) {
+        throw new Error('Document not found');
+      }
+
+      const document = documents[docIndex];
+      const oldFolderId = document.folderId || this.folderService.getDefaultFolderId();
+      
+      // Update document metadata
+      documents[docIndex] = {
+        ...document,
+        folderId: targetFolderId,
+        folderName: this.folderService.getFolder(targetFolderId)?.name || 'Unknown',
+        movedAt: new Date().toISOString()
+      };
+
+      // Save updated documents
+      this.store.set('documents', documents);
+      
+      console.log(`📁 Moved document "${document.originalName}" to folder: ${documents[docIndex].folderName}`);
+      
+      return {
+        success: true,
+        document: documents[docIndex],
+        oldFolderId: oldFolderId,
+        newFolderId: targetFolderId
+      };
+    } catch (error) {
+      console.error('❌ Error moving document:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Move multiple documents to a folder (used when deleting folders)
+  moveDocumentsToFolder(sourceFolderId, targetFolderId) {
+    try {
+      const documents = this.getAllDocuments();
+      const documentsToMove = documents.filter(doc => 
+        (doc.folderId || this.folderService.getDefaultFolderId()) === sourceFolderId
+      );
+
+      if (documentsToMove.length === 0) {
+        return { success: true, movedCount: 0 };
+      }
+
+      // Validate target folder
+      if (!this.folderService.validateFolder(targetFolderId)) {
+        throw new Error('Target folder does not exist');
+      }
+
+      const targetFolder = this.folderService.getFolder(targetFolderId);
+      let movedCount = 0;
+
+      // Update each document
+      const updatedDocuments = documents.map(doc => {
+        if (documentsToMove.some(moveDoc => moveDoc.id === doc.id)) {
+          movedCount++;
+          return {
+            ...doc,
+            folderId: targetFolderId,
+            folderName: targetFolder?.name || 'Unknown',
+            movedAt: new Date().toISOString()
+          };
+        }
+        return doc;
+      });
+
+      // Save updated documents
+      this.store.set('documents', updatedDocuments);
+      
+      console.log(`📁 Moved ${movedCount} documents to folder: ${targetFolder?.name}`);
+      
+      return { success: true, movedCount: movedCount };
+    } catch (error) {
+      console.error('❌ Error moving documents:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Get folder statistics with document counts
+  getFolderStatistics() {
+    try {
+      const documents = this.getAllDocuments();
+      const folders = this.folderService.getAllFolders();
+      
+      const stats = folders.map(folder => {
+        const docsInFolder = documents.filter(doc => 
+          (doc.folderId || this.folderService.getDefaultFolderId()) === folder.id
+        );
+        
+        return {
+          ...folder,
+          documentCount: docsInFolder.length,
+          documents: docsInFolder.map(doc => ({
+            id: doc.id,
+            name: doc.originalName,
+            uploadedAt: doc.uploadedAt,
+            status: doc.status
+          }))
+        };
+      });
+
+      return { success: true, folders: stats };
+    } catch (error) {
+      console.error('❌ Error getting folder statistics:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Search documents within specific folder
+  async searchDocumentsInFolder(query, folderId, searchType = 'hybrid') {
+    try {
+      // Get all search results first
+      const allResults = await this.searchDocuments(query, searchType);
+      
+      // Filter by folder
+      const folderResults = allResults.filter(result => {
+        const docFolderId = result.document.folderId || this.folderService.getDefaultFolderId();
+        return docFolderId === folderId;
+      });
+
+      console.log(`🔍 Folder search "${query}" in folder ${folderId}: ${folderResults.length} results`);
+      return folderResults;
+    } catch (error) {
+      console.error('❌ Error searching in folder:', error);
+      return [];
+    }
+  }
+
+  // 🎯 NEW: Search within a specific document only
+  async searchInDocument(query, documentId, searchType = 'hybrid') {
+    try {
+      console.log(`🎯 Document-focused search: "${query}" in document ${documentId}`);
+      
+      // Get all search results first
+      const allResults = await this.searchDocuments(query, searchType);
+      
+      // Filter by specific document ID
+      const documentResults = allResults.filter(result => {
+        return result.document.id === documentId;
+      });
+
+      console.log(`🎯 Document search "${query}" in document ${documentId}: ${documentResults.length} results`);
+      return documentResults;
+    } catch (error) {
+      console.error('❌ Error searching in document:', error);
+      return [];
+    }
+  }
+
+  // Migrate existing documents to default folder (for backward compatibility)
+  migrateDocumentsToFolders() {
+    try {
+      const documents = this.getAllDocuments();
+      const defaultFolderId = this.folderService.getDefaultFolderId();
+      let migratedCount = 0;
+
+      const updatedDocuments = documents.map(doc => {
+        if (!doc.folderId) {
+          migratedCount++;
+          return {
+            ...doc,
+            folderId: defaultFolderId,
+            folderName: 'All Documents',
+            migratedAt: new Date().toISOString()
+          };
+        }
+        return doc;
+      });
+
+      if (migratedCount > 0) {
+        this.store.set('documents', updatedDocuments);
+        console.log(`📁 Migrated ${migratedCount} documents to default folder`);
+      }
+
+      return { success: true, migratedCount: migratedCount };
+    } catch (error) {
+      console.error('❌ Error migrating documents:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Get all folder service methods (passthrough)
+  getAllFolders() {
+    return this.folderService.getAllFolders();
+  }
+
+  createFolder(name, options = {}) {
+    return this.folderService.createFolder(name, options);
+  }
+
+  updateFolder(folderId, updates) {
+    return this.folderService.updateFolder(folderId, updates);
+  }
+
+  deleteFolder(folderId, targetFolderId = null) {
+    return this.folderService.deleteFolder(folderId, targetFolderId || this.folderService.getDefaultFolderId());
   }
 }
 

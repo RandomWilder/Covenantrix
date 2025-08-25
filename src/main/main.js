@@ -119,6 +119,17 @@ app.whenReady().then(async () => {
   // Initialize services
   await ragService.initialize();
   
+  // Run document folder migration
+  console.log('🔄 Running document folder migration...');
+  const migrationResult = documentService.migrateDocumentsToFolders();
+  if (migrationResult.success && migrationResult.migratedCount > 0) {
+    console.log(`✅ Migration completed: ${migrationResult.migratedCount} documents moved to default folder`);
+  } else if (migrationResult.success) {
+    console.log('✅ Migration completed: All documents already have folders assigned');
+  } else {
+    console.warn('⚠️ Migration warning:', migrationResult.error);
+  }
+  
   console.log('✅ All services initialized with shared instances');
   
   setupIPCHandlers();
@@ -252,6 +263,64 @@ function setupIPCHandlers() {
     };
   });
 
+  // 📁 FOLDER MANAGEMENT IPC HANDLERS
+
+  // Get all folders with document counts
+  ipcMain.handle('get-folders', async () => {
+    return ragService.getFolderStatistics();
+  });
+
+  // Create new folder
+  ipcMain.handle('create-folder', async (event, name, options = {}) => {
+    return ragService.createFolder(name, options);
+  });
+
+  // Update folder
+  ipcMain.handle('update-folder', async (event, folderId, updates) => {
+    return ragService.updateFolder(folderId, updates);
+  });
+
+  // Delete folder
+  ipcMain.handle('delete-folder', async (event, folderId, targetFolderId = null) => {
+    return ragService.deleteFolder(folderId, targetFolderId);
+  });
+
+  // Move document to folder
+  ipcMain.handle('move-document-to-folder', async (event, documentId, targetFolderId) => {
+    return ragService.moveDocumentToFolder(documentId, targetFolderId);
+  });
+
+  // Get documents in specific folder
+  ipcMain.handle('get-documents-in-folder', async (event, folderId) => {
+    return ragService.getDocumentsByFolder(folderId);
+  });
+
+  // Search documents within specific folder
+  ipcMain.handle('search-documents-in-folder', async (event, query, folderId, searchType = 'hybrid') => {
+    return ragService.searchDocumentsInFolder(query, folderId, searchType);
+  });
+
+  // 🎯 NEW: Search within specific document
+  ipcMain.handle('search-in-document', async (event, query, documentId, searchType = 'hybrid') => {
+    return ragService.searchInDocument(query, documentId, searchType);
+  });
+
+  // 🎯 NEW: RAG query focused on specific document
+  ipcMain.handle('rag-query-document', async (event, query, documentId, conversationId, options = {}) => {
+    try {
+      return await ragService.queryDocument(query, documentId, conversationId, options);
+    } catch (error) {
+      console.error('RAG document query error:', error);
+      return {
+        response: 'Sorry, I encountered an error processing your question. Please try again.',
+        sources: [],
+        conversationId: conversationId || ragService.generateConversationId(),
+        error: error.message,
+        documentId: documentId
+      };
+    }
+  });
+
 
 
   // Test OCR connectivity
@@ -316,6 +385,22 @@ function setupIPCHandlers() {
     }
   });
 
+  // RAG query focused on specific folder
+  ipcMain.handle('rag-query-folder', async (event, query, folderId, conversationId, options = {}) => {
+    try {
+      return await ragService.queryDocumentsInFolder(query, folderId, conversationId, options);
+    } catch (error) {
+      console.error('RAG folder query error:', error);
+      return {
+        response: 'Sorry, I encountered an error processing your question. Please try again.',
+        sources: [],
+        conversationId: conversationId || ragService.generateConversationId(),
+        error: error.message,
+        folderId: folderId
+      };
+    }
+  });
+
   // Get conversation history
   ipcMain.handle('get-conversation-history', async (event, conversationId) => {
     return ragService.getConversationHistory(conversationId);
@@ -339,6 +424,23 @@ function setupIPCHandlers() {
   // Generate new conversation ID
   ipcMain.handle('generate-conversation-id', async () => {
     return ragService.generateConversationId();
+  });
+
+  // 🎭 Persona Management IPC Handlers
+  ipcMain.handle('get-current-persona', async () => {
+    return ragService.getCurrentPersona();
+  });
+
+  ipcMain.handle('get-all-personas', async () => {
+    return ragService.getAllPersonas();
+  });
+
+  ipcMain.handle('switch-persona', async (event, personaId) => {
+    return ragService.switchPersona(personaId);
+  });
+
+  ipcMain.handle('clear-current-persona-conversations', async () => {
+    return ragService.clearCurrentPersonaConversations();
   });
 
   // Phase 3: Google Vision OCR Configuration (Simplified)

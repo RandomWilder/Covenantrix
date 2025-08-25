@@ -38,6 +38,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearAllConversations: () => ipcRenderer.invoke('clear-all-conversations'),
   generateConversationId: () => ipcRenderer.invoke('generate-conversation-id'),
 
+  // 🎭 Persona Management
+  getCurrentPersona: () => ipcRenderer.invoke('get-current-persona'),
+  getAllPersonas: () => ipcRenderer.invoke('get-all-personas'),
+  switchPersona: (personaId) => ipcRenderer.invoke('switch-persona', personaId),
+  clearCurrentPersonaConversations: () => ipcRenderer.invoke('clear-current-persona-conversations'),
+
+  // 📁 Folder Management
+  getFolders: () => ipcRenderer.invoke('get-folders'),
+  createFolder: (name, options) => ipcRenderer.invoke('create-folder', name, options),
+  updateFolder: (folderId, updates) => ipcRenderer.invoke('update-folder', folderId, updates),
+  deleteFolder: (folderId, targetFolderId) => ipcRenderer.invoke('delete-folder', folderId, targetFolderId),
+  moveDocumentToFolder: (documentId, targetFolderId) => ipcRenderer.invoke('move-document-to-folder', documentId, targetFolderId),
+  getDocumentsInFolder: (folderId) => ipcRenderer.invoke('get-documents-in-folder', folderId),
+  searchDocumentsInFolder: (query, folderId, searchType) => ipcRenderer.invoke('search-documents-in-folder', query, folderId, searchType),
+  ragQueryFolder: (query, folderId, conversationId, options) => ipcRenderer.invoke('rag-query-folder', query, folderId, conversationId, options),
+
+  // 🎯 Document Focus
+  searchInDocument: (query, documentId, searchType) => ipcRenderer.invoke('search-in-document', query, documentId, searchType),
+  ragQueryDocument: (query, documentId, conversationId, options) => ipcRenderer.invoke('rag-query-document', query, documentId, conversationId, options),
+
   // Phase 3: Google Vision OCR Configuration (Simplified)
   setGoogleVisionServiceAccount: (serviceAccountPath) => ipcRenderer.invoke('set-google-vision-service-account', serviceAccountPath),
   getGoogleVisionInfo: () => ipcRenderer.invoke('get-google-vision-info'),
