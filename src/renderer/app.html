@@ -305,13 +305,179 @@
             font-size: 0.8em;
             margin-left: 5px;
         }
+
+        /* Chat Interface Styles */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: linear-gradient(135deg, #f8f9ff 0%, #fff 100%);
+        }
+
+        .welcome-message {
+            margin-bottom: 20px;
+        }
+
+        .user-message, .assistant-message {
+            display: flex;
+            margin-bottom: 15px;
+            align-items: flex-start;
+        }
+
+        .user-message {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            font-size: 1.5em;
+            margin: 0 10px;
+            flex-shrink: 0;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 15px;
+            position: relative;
+        }
+
+        .user-message .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+
+        .assistant-message .message-content {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .message-sources {
+            margin-top: 10px;
+            padding: 8px;
+            background: #f0f4ff;
+            border-radius: 5px;
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        .source-item {
+            display: inline-block;
+            margin: 2px 4px;
+            padding: 2px 8px;
+            background: #e8f4ff;
+            border-radius: 10px;
+            font-size: 0.75em;
+        }
+
+        .chat-input-area {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #e0e0e0;
+            background: white;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 1em;
+            outline: none;
+            margin-right: 10px;
+        }
+
+        .chat-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .chat-send-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease;
+        }
+
+        .chat-send-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .chat-send-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .chat-controls {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .typing-dots {
+            display: flex;
+            margin-left: 10px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            margin: 0 2px;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .message-timestamp {
+            font-size: 0.7em;
+            color: #999;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>📄 Covenantrix</h1>
-            <span class="version">v1.1.0 (Phase 2)</span>
+            <span class="version">v1.2.0 (Phase 3 - RAG Chat)</span>
         </div>
 
         <div class="main-content">
@@ -330,6 +496,38 @@
                 <button class="btn-small btn-danger" onclick="clearApiKey()">Clear Key</button>
                 <div id="api-key-status" style="margin-top: 10px; font-size: 0.9em;"></div>
                 
+                <h3 style="margin: 20px 0 10px 0;">🔍 OCR Engine Configuration</h3>
+                <div id="ocr-config-section">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">OCR Engine:</label>
+                        <select id="ocr-engine-select" class="api-key-input" style="width: 100%; margin-bottom: 10px;" onchange="updateOCREngine()">
+                            <option value="auto">Auto-Select (Recommended)</option>
+                            <option value="tesseract">Tesseract (Free, Local)</option>
+                            <option value="google_vision">Google Vision (Premium, Cloud)</option>
+                        </select>
+                    </div>
+                    
+                    <div id="google-vision-config" style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Google Vision Service Account:</label>
+                        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                            <button class="btn-small" onclick="selectGoogleServiceAccount()">📁 Upload JSON File</button>
+                            <button class="btn-small btn-danger" onclick="clearGoogleServiceAccount()" id="clear-google-btn" style="display: none;">🗑️ Clear</button>
+                        </div>
+                        <div id="google-vision-status" style="font-size: 0.9em; margin-bottom: 10px;"></div>
+                        
+
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Settings:</label>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <input type="checkbox" id="enable-fallback" checked onchange="updateOCRSettings()">
+                            <label for="enable-fallback" style="font-size: 0.9em;">Enable automatic fallback between engines</label>
+                        </div>
+
+                    </div>
+                </div>
+                
                 <div class="stats-grid">
                     <div class="stat-item">
                         <div class="stat-value" id="total-docs">0</div>
@@ -344,8 +542,8 @@
                         <div class="stat-label">Semantic Search</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-value" id="language-status">🌐</div>
-                        <div class="stat-label">OCR Languages</div>
+                        <div class="stat-value" id="ocr-engine-status">🔄</div>
+                        <div class="stat-label">OCR Engine</div>
                     </div>
                 </div>
             </div>
@@ -365,39 +563,61 @@
                 <button class="btn" onclick="selectFiles()">Browse Files</button>
                 
                 <div id="contracts-list" class="contracts-list hidden">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3>Uploaded Documents</h3>
+                        <button 
+                            class="btn-small btn-danger" 
+                            onclick="deleteAllDocuments()"
+                            id="delete-all-btn"
+                            title="Delete all documents"
+                            style="display: none;">
+                            🗑️ Delete All
+                        </button>
+                    </div>
                     <div id="contracts"></div>
                 </div>
             </div>
 
-            <!-- Search Card -->
+            <!-- Chat Interface Card -->
             <div class="card">
-                <h2>🔍 Query Documents</h2>
+                <h2>💬 Chat with Your Documents</h2>
                 
-                <div class="search-modes">
-                    <div class="search-mode active" data-mode="hybrid" onclick="setSearchMode('hybrid')">
-                        🧠 Hybrid Search
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="welcome-message">
+                            <div class="assistant-message">
+                                <div class="message-avatar">🤖</div>
+                                <div class="message-content">
+                                    <p>Hello! I'm Covenantrix, your AI contract analyst. I can help you understand your legal documents through natural conversation.</p>
+                                    <p>Ask me anything about your uploaded contracts, such as:</p>
+                                    <ul>
+                                        <li>"Who are the parties in this agreement?"</li>
+                                        <li>"What are the payment terms?"</li>
+                                        <li>"When does this contract expire?"</li>
+                                        <li>"What are the termination conditions?"</li>
+                                    </ul>
                     </div>
-                    <div class="search-mode" data-mode="semantic" onclick="setSearchMode('semantic')">
-                        🎯 Semantic
                     </div>
-                    <div class="search-mode" data-mode="keyword" onclick="setSearchMode('keyword')">
-                        📝 Keyword
                     </div>
                 </div>
                 
+                    <div class="chat-input-area">
                 <input 
                     type="text" 
-                    id="query-input"
-                    class="query-input" 
-                    placeholder="Ask questions about your documents..."
-                    onkeypress="handleEnter(event)"
-                >
-                <button class="btn" onclick="searchContracts()">Search</button>
-
-                <div id="results" class="results hidden">
-                    <h3>Results</h3>
-                    <div id="results-content"></div>
+                            id="chat-input"
+                            class="chat-input" 
+                            placeholder="Ask questions about your contracts..."
+                            onkeypress="handleChatEnter(event)"
+                        >
+                        <button class="chat-send-btn" id="send-btn" onclick="sendMessage()">
+                            <span>📤</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="chat-controls">
+                    <button class="btn-small" onclick="startNewConversation()">🆕 New Chat</button>
+                    <button class="btn-small" onclick="clearChatHistory()">🗑️ Clear History</button>
                 </div>
             </div>
         </div>
@@ -408,7 +628,8 @@
         
         let contracts = [];
         let processingFiles = {};
-        let currentSearchMode = 'hybrid';
+        let currentConversationId = null;
+        let isWaitingForResponse = false;
 
         // Initialize the app
         async function initializeApp() {
@@ -416,6 +637,7 @@
             setupDragAndDrop();
             setupProcessingListener();
             await loadApiKeyStatus();
+            await loadOCRSettings();
             await updateStats();
         }
 
@@ -560,9 +782,11 @@
         function updateContractsList() {
             const listElement = document.getElementById('contracts-list');
             const contractsElement = document.getElementById('contracts');
+            const deleteAllBtn = document.getElementById('delete-all-btn');
             
             if (contracts.length > 0) {
                 listElement.classList.remove('hidden');
+                deleteAllBtn.style.display = 'block'; // Show delete all button when there are documents
                 
                 // Remove old contract items (keep processing items)
                 const existingContracts = contractsElement.querySelectorAll('.contract-item:not([id*="processing-"])');
@@ -573,98 +797,483 @@
                     const contractItem = document.createElement('div');
                     contractItem.className = 'contract-item';
                     contractItem.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1;">
                         <strong>${contract.originalName}</strong>
                         <span class="status ready">Ready</span>
                         <div style="clear: both; font-size: 0.8em; color: #666; margin-top: 5px;">
                             ${new Date(contract.uploadedAt).toLocaleString()} • ${contract.chunksCount} chunks
-                            ${contract.ocrConfidence ? `• OCR: ${Math.round(contract.ocrConfidence)}%` : ''}
+                                    ${contract.ocrConfidence !== undefined ? `• OCR: ${Math.round(contract.ocrConfidence)}%` : ''}
+                                    ${contract.ocrEngine ? `• ${contract.ocrEngine === 'google_vision' ? '🚀 Google' : contract.ocrEngine === 'hybrid' ? '🔄 Hybrid' : '🔤 Tesseract'}` : ''}
+                                    ${contract.isScannedPDF ? '• 📄 Scanned PDF' : ''}
                             ${contract.detectedLanguage ? `• 🌐 ${contract.detectedLanguage}` : ''}
+                                    ${contract.ocrError ? `• ❌ OCR Error` : ''}
                         </div>
                         <div style="clear: both; font-size: 0.8em; color: #999; margin-top: 2px;">
                             ${Math.round(contract.textLength / 1000)}k characters
                             ${contract.vectorized ? ' • 🧠 Vectorized' : ' • ⚠️ Not vectorized'}
                             ${contract.hasHebrew ? ' • 🔤 Hebrew' : ''}
                             ${contract.hasArabic ? ' • 🔤 Arabic' : ''}
+                                </div>
+                                ${contract.ocrError ? `
+                                <div style="clear: both; font-size: 0.8em; color: #d32f2f; margin-top: 5px; padding: 5px; background: #ffebee; border-radius: 3px;">
+                                    <strong>⚠️ OCR Processing Failed:</strong> ${contract.ocrError}
+                                </div>
+                                ` : ''}
+                            </div>
+                            <button 
+                                class="btn-small btn-danger" 
+                                onclick="deleteDocument('${contract.id}', '${contract.originalName}')"
+                                title="Delete this document"
+                                style="margin-left: 10px; flex-shrink: 0;">
+                                🗑️ Delete
+                            </button>
                         </div>
                     `;
                     contractsElement.appendChild(contractItem);
                 });
+            } else {
+                deleteAllBtn.style.display = 'none'; // Hide delete all button when no documents
             }
         }
 
-        // Enhanced search with different modes
-        async function searchContracts() {
-            const query = document.getElementById('query-input').value.trim();
-            if (!query) return;
+        // Chat functionality
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const query = input.value.trim();
             
-            console.log(`🔍 Searching for: "${query}" using ${currentSearchMode} mode`);
+            if (!query || isWaitingForResponse) return;
             
-            const resultsElement = document.getElementById('results');
-            const resultsContent = document.getElementById('results-content');
+            // Clear input and disable send button
+            input.value = '';
+            isWaitingForResponse = true;
+            updateSendButtonState();
             
-            resultsContent.innerHTML = '<div class="result-item">🔍 Searching...</div>';
-            resultsElement.classList.remove('hidden');
+            // Add user message to chat
+            addUserMessage(query);
+            
+            // Show typing indicator
+            const typingId = showTypingIndicator();
             
             try {
-                const results = await window.electronAPI.searchDocuments(query, currentSearchMode);
+                // Generate conversation ID if needed
+                if (!currentConversationId) {
+                    currentConversationId = await window.electronAPI.generateConversationId();
+                }
                 
-                if (results.length > 0) {
-                    resultsContent.innerHTML = results.map(result => `
-                        <div class="result-item">
-                            <div>
-                                <strong>Found ${result.matches} match${result.matches > 1 ? 'es' : ''} in:</strong> 
-                                ${result.document.originalName}
-                                <span class="search-type-badge">${result.searchType || currentSearchMode}</span>
-                                ${result.avgSimilarity ? `<span class="similarity-score">${Math.round(result.avgSimilarity * 100)}% match</span>` : ''}
+                // Send RAG query
+                console.log(`💬 Sending message: "${query}"`);
+                const response = await window.electronAPI.ragQuery(query, currentConversationId, {
+                    maxResults: 5,
+                    useConversationContext: true,
+                    searchType: 'hybrid'
+                });
+                
+                // Remove typing indicator
+                removeTypingIndicator(typingId);
+                
+                // Add assistant response to chat
+                addAssistantMessage(response.response, response.sources, response.queryType);
+                
+                console.log(`✅ Received response (${response.response.length} chars)`);
+                
+            } catch (error) {
+                console.error('Error sending message:', error);
+                
+                // Remove typing indicator and show error
+                removeTypingIndicator(typingId);
+                addAssistantMessage(
+                    `Sorry, I encountered an error processing your question: ${error.message}. Please try again.`,
+                    [],
+                    'error'
+                );
+            }
+            
+            // Re-enable input
+            isWaitingForResponse = false;
+            updateSendButtonState();
+            input.focus();
+        }
+
+        function addUserMessage(text) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'user-message';
+            messageDiv.innerHTML = `
+                <div class="message-avatar">👤</div>
+                <div class="message-content">
+                    <p>${escapeHtml(text)}</p>
+                    <div class="message-timestamp">${new Date().toLocaleTimeString()}</div>
                             </div>
-                            ${result.chunks.map(chunk => `
-                                <div style="margin: 10px 0; padding: 10px; background: #f0f4ff; border-left: 3px solid #667eea; font-size: 0.9em;">
-                                    ${chunk.text.substring(0, 250)}${chunk.text.length > 250 ? '...' : ''}
-                                    ${chunk.similarity ? `<div style="font-size: 0.8em; color: #666; margin-top: 5px;">Similarity: ${Math.round(chunk.similarity * 100)}%</div>` : ''}
-                                </div>
+            `;
+            messagesContainer.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        function addAssistantMessage(text, sources = [], queryType = 'general') {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'assistant-message';
+            
+            let sourcesHtml = '';
+            if (sources && sources.length > 0) {
+                sourcesHtml = `
+                    <div class="message-sources">
+                        <strong>📋 Sources:</strong><br>
+                        ${sources.map(source => `
+                            <span class="source-item">
+                                📄 ${source.document} (${source.matches} matches${source.similarity ? `, ${Math.round(source.similarity * 100)}% similarity` : ''})
+                            </span>
                             `).join('')}
-                            <div style="margin-top: 10px; font-size: 0.8em; color: #666;">
-                                📄 ${result.document.originalName} 
-                                • ${result.matches} matches 
-                                ${result.document.ocrConfidence ? `• OCR: ${Math.round(result.document.ocrConfidence)}%` : ''}
-                                ${result.document.vectorized ? '• 🧠 Vectorized' : ''}
                             </div>
+                `;
+            }
+            
+            messageDiv.innerHTML = `
+                <div class="message-avatar">🤖</div>
+                <div class="message-content">
+                    <p>${formatMessageText(text)}</p>
+                    ${sourcesHtml}
+                    <div class="message-timestamp">${new Date().toLocaleTimeString()}</div>
                         </div>
-                    `).join('');
-                } else {
-                    resultsContent.innerHTML = `
-                        <div class="result-item">
-                            <div>No results found for: "${query}"</div>
-                            <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                                ${currentSearchMode === 'semantic' ? 'Make sure you have an OpenAI API key configured and documents are vectorized.' : 'Try different keywords or upload more documents.'}
+            `;
+            messagesContainer.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        function showTypingIndicator() {
+            const messagesContainer = document.getElementById('chat-messages');
+            const typingDiv = document.createElement('div');
+            const typingId = 'typing-' + Date.now();
+            typingDiv.id = typingId;
+            typingDiv.className = 'typing-indicator';
+            typingDiv.innerHTML = `
+                <div class="message-avatar">🤖</div>
+                <div class="message-content" style="background: white; border: 1px solid #e0e0e0; display: flex; align-items: center;">
+                    <span style="margin-right: 10px;">Thinking</span>
+                    <div class="typing-dots">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
                             </div>
                         </div>
                     `;
-                }
-            } catch (error) {
-                console.error('Error searching:', error);
-                resultsContent.innerHTML = `
-                    <div class="result-item">
-                        <div style="color: #d32f2f;">Search failed: ${error.message}</div>
-                        <div style="margin-top: 5px; font-size: 0.9em;">
-                            ${currentSearchMode === 'semantic' ? 'Semantic search requires an OpenAI API key. Try keyword search instead.' : ''}
-                        </div>
-                    </div>
-                `;
+            messagesContainer.appendChild(typingDiv);
+            scrollToBottom();
+            return typingId;
+        }
+
+        function removeTypingIndicator(typingId) {
+            const typingDiv = document.getElementById(typingId);
+            if (typingDiv) {
+                typingDiv.remove();
             }
         }
 
-        // Search mode selection
-        function setSearchMode(mode) {
-            currentSearchMode = mode;
+        function scrollToBottom() {
+            const messagesContainer = document.getElementById('chat-messages');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function updateSendButtonState() {
+            const sendBtn = document.getElementById('send-btn');
+            sendBtn.disabled = isWaitingForResponse;
+        }
+
+        async function startNewConversation() {
+            currentConversationId = null;
+            const messagesContainer = document.getElementById('chat-messages');
             
-            // Update UI
-            document.querySelectorAll('.search-mode').forEach(element => {
-                element.classList.remove('active');
-            });
-            document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+            // Clear all messages except welcome message
+            const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+            messagesContainer.innerHTML = '';
+            if (welcomeMessage) {
+                messagesContainer.appendChild(welcomeMessage);
+            }
             
-            console.log(`Search mode changed to: ${mode}`);
+            console.log('🆕 Started new conversation');
+        }
+
+        async function clearChatHistory() {
+            if (confirm('Are you sure you want to clear all chat history? This action cannot be undone.')) {
+                try {
+                    await window.electronAPI.clearAllConversations();
+                    await startNewConversation();
+                    console.log('🗑️ Chat history cleared');
+            } catch (error) {
+                    console.error('Error clearing chat history:', error);
+                    alert('Error clearing chat history: ' + error.message);
+                }
+            }
+        }
+
+        function formatMessageText(text) {
+            // Simple formatting for better readability
+            return escapeHtml(text)
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function handleChatEnter(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // Document deletion functionality
+        async function deleteDocument(documentId, documentName) {
+            const confirmMessage = `Are you sure you want to delete "${documentName}"?\n\nThis will permanently remove:
+• The document file
+• All extracted text and chunks
+• Vector embeddings
+• Any conversation references
+
+This action cannot be undone.`;
+
+            if (confirm(confirmMessage)) {
+                try {
+                    console.log(`🗑️ Deleting document: ${documentName} (${documentId})`);
+                    
+                    const success = await window.electronAPI.deleteDocument(documentId);
+                    
+                    if (success) {
+                        // Remove from local contracts array
+                        contracts = contracts.filter(contract => contract.id !== documentId);
+                        
+                        // Update UI
+                        updateContractsList();
+                        await updateStats();
+                        
+                        // Start new chat conversation since documents changed
+                        await startNewConversation();
+                        
+                        console.log(`✅ Document "${documentName}" deleted successfully`);
+                        
+                        // Show success message briefly
+                        const deleteAllBtn = document.getElementById('delete-all-btn');
+                        if (deleteAllBtn) {
+                            const originalText = deleteAllBtn.textContent;
+                            deleteAllBtn.textContent = '✅ Deleted';
+                            deleteAllBtn.disabled = true;
+                            
+                            setTimeout(() => {
+                                deleteAllBtn.textContent = originalText;
+                                deleteAllBtn.disabled = false;
+                            }, 2000);
+                        }
+                        
+                    } else {
+                        alert('Failed to delete document. Please try again.');
+                    }
+                } catch (error) {
+                    console.error('Error deleting document:', error);
+                    alert(`Error deleting document: ${error.message}`);
+                }
+            }
+        }
+
+        async function deleteAllDocuments() {
+            if (contracts.length === 0) {
+                alert('No documents to delete.');
+                return;
+            }
+
+            const confirmMessage = `⚠️ WARNING: DELETE ALL DOCUMENTS ⚠️
+
+This will permanently delete ALL ${contracts.length} uploaded documents including:
+• All document files
+• All extracted text and chunks  
+• All vector embeddings
+• All conversation history
+
+This action cannot be undone.
+
+Type "DELETE ALL" to confirm:`;
+
+            const userConfirmation = prompt(confirmMessage);
+            
+            if (userConfirmation === 'DELETE ALL') {
+                try {
+                    console.log(`🗑️ Deleting all ${contracts.length} documents...`);
+                    
+                    // Delete each document
+                    let deletedCount = 0;
+                    const totalCount = contracts.length;
+                    
+                    for (const contract of contracts) {
+                        try {
+                            const success = await window.electronAPI.deleteDocument(contract.id);
+                            if (success) {
+                                deletedCount++;
+                                console.log(`✅ Deleted ${deletedCount}/${totalCount}: ${contract.originalName}`);
+                            }
+                        } catch (error) {
+                            console.error(`❌ Failed to delete ${contract.originalName}:`, error);
+                        }
+                    }
+                    
+                    // Clear local contracts array
+                    contracts = [];
+                    
+                    // Clear all conversations since documents are gone
+                    await window.electronAPI.clearAllConversations();
+                    
+                    // Update UI
+                    updateContractsList();
+                    await updateStats();
+                    await startNewConversation();
+                    
+                    if (deletedCount === totalCount) {
+                        alert(`✅ Successfully deleted all ${deletedCount} documents and cleared conversation history.`);
+                        console.log(`✅ Successfully deleted all ${deletedCount} documents`);
+                    } else {
+                        alert(`⚠️ Deleted ${deletedCount} out of ${totalCount} documents. Some deletions may have failed.`);
+                        console.log(`⚠️ Deleted ${deletedCount} out of ${totalCount} documents`);
+                    }
+                    
+                } catch (error) {
+                    console.error('Error deleting all documents:', error);
+                    alert(`Error deleting documents: ${error.message}`);
+                }
+            } else if (userConfirmation !== null) {
+                alert('Deletion cancelled. You must type "DELETE ALL" exactly to confirm.');
+            }
+        }
+
+        // OCR Settings Management
+        async function loadOCRSettings() {
+            try {
+                const [ocrSettings, googleVisionInfo] = await Promise.all([
+                    window.electronAPI.getOCRSettings(),
+                    window.electronAPI.getGoogleVisionInfo()
+                ]);
+
+                // Update OCR engine selection
+                document.getElementById('ocr-engine-select').value = ocrSettings.primaryEngine || 'auto';
+                document.getElementById('enable-fallback').checked = ocrSettings.enableFallback !== false;
+
+                // Update Google Vision status
+                updateGoogleVisionStatus(googleVisionInfo);
+
+                console.log('✅ OCR settings loaded');
+            } catch (error) {
+                console.error('Error loading OCR settings:', error);
+                updateGoogleVisionStatus({ isConfigured: false });
+            }
+        }
+
+        function updateGoogleVisionStatus(googleInfo) {
+            const statusElement = document.getElementById('google-vision-status');
+            const clearButton = document.getElementById('clear-google-btn');
+
+            if (googleInfo.isConfigured) {
+                statusElement.innerHTML = `
+                    <div style="color: #2e7d32;">
+                        ✅ <strong>Google Vision Configured</strong><br>
+                        📁 Project: ${googleInfo.projectId}<br>
+                        🔄 Status: ${googleInfo.isInitialized ? 'Active' : 'Initializing...'}
+                        </div>
+                `;
+                clearButton.style.display = 'inline-block';
+            } else {
+                statusElement.innerHTML = `
+                    <div style="color: #666;">
+                        ⚠️ Google Vision not configured<br>
+                        <small>Upload service account JSON to enable premium OCR</small>
+                    </div>
+                `;
+                clearButton.style.display = 'none';
+            }
+        }
+
+        async function selectGoogleServiceAccount() {
+            try {
+                const result = await window.electronAPI.selectGoogleServiceAccountFile();
+                
+                if (!result.success || result.canceled) {
+                    return;
+                }
+
+                console.log('📁 Selected service account file:', result.filePath);
+                
+                // Show loading state
+                const statusElement = document.getElementById('google-vision-status');
+                statusElement.innerHTML = '🔄 Configuring Google Vision...';
+
+                const configResult = await window.electronAPI.setGoogleVisionServiceAccount(result.filePath);
+                
+                if (configResult.success) {
+                    console.log('✅ Google Vision configured successfully');
+                    
+                    // Reload settings to show new status
+                    await loadOCRSettings();
+                    await updateStats();
+                    
+                    alert(`✅ Google Vision configured successfully!\n\nProject: ${configResult.projectId}\n\nYou can now use premium OCR features.`);
+                } else {
+                    console.error('❌ Failed to configure Google Vision:', configResult.error);
+                    statusElement.innerHTML = `
+                        <div style="color: #d32f2f;">
+                            ❌ Configuration failed: ${configResult.error}
+                        </div>
+                    `;
+                    alert(`❌ Failed to configure Google Vision:\n\n${configResult.error}`);
+                }
+                
+            } catch (error) {
+                console.error('Error selecting service account:', error);
+                alert(`Error selecting service account: ${error.message}`);
+            }
+        }
+
+        async function clearGoogleServiceAccount() {
+            if (confirm('Are you sure you want to remove Google Vision configuration?\n\nThis will disable premium OCR features.')) {
+                try {
+                    await window.electronAPI.clearGoogleVisionServiceAccount();
+                    await loadOCRSettings();
+                    await updateStats();
+                    console.log('🗑️ Google Vision configuration cleared');
+                } catch (error) {
+                    console.error('Error clearing Google Vision:', error);
+                    alert(`Error clearing configuration: ${error.message}`);
+                }
+            }
+        }
+
+        async function updateOCREngine() {
+            await updateOCRSettings();
+        }
+
+        async function updateOCRSettings() {
+            try {
+                const settings = {
+                    primaryEngine: document.getElementById('ocr-engine-select').value,
+                    enableFallback: document.getElementById('enable-fallback').checked
+                };
+
+                await window.electronAPI.updateOCRSettings(settings);
+                
+                console.log('⚙️ OCR settings updated:', settings);
+                
+                // Show brief confirmation
+                const selectElement = document.getElementById('ocr-engine-select');
+                const originalColor = selectElement.style.backgroundColor;
+                selectElement.style.backgroundColor = '#e8f5e8';
+                setTimeout(() => {
+                    selectElement.style.backgroundColor = originalColor;
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Error updating OCR settings:', error);
+                alert(`Error updating OCR settings: ${error.message}`);
+            }
         }
 
         // API Key Management
@@ -741,13 +1350,22 @@
                 document.getElementById('vector-status').textContent = vectorStats.has_openai_key ? '✅' : '❌';
                 
                 // Update language support status
-                const langStatus = document.getElementById('language-status');
-                if (languageSupport.hasHebrewSupport) {
-                    langStatus.textContent = languageSupport.hasMultiLanguageSupport ? '🌐✅' : '🔤✅';
-                    langStatus.title = `OCR supports: ${languageSupport.activeWorkers.join(', ')}`;
+                // Update OCR engine status
+                const ocrEngineStatus = document.getElementById('ocr-engine-status');
+                try {
+                    const ocrSettings = await window.electronAPI.getOCRSettings();
+                    const googleVisionInfo = await window.electronAPI.getGoogleVisionInfo();
+                    
+                    if (googleVisionInfo.isConfigured && ocrSettings.googleVisionAvailable) {
+                        ocrEngineStatus.textContent = '🚀';
+                        ocrEngineStatus.title = 'Google Vision + Tesseract available';
                 } else {
-                    langStatus.textContent = '🔤';
-                    langStatus.title = 'OCR supports: English only';
+                        ocrEngineStatus.textContent = '🔤';
+                        ocrEngineStatus.title = 'Tesseract only';
+                    }
+                } catch (error) {
+                    ocrEngineStatus.textContent = '❌';
+                    ocrEngineStatus.title = 'OCR error';
                 }
             } catch (error) {
                 console.error('Error updating stats:', error);
@@ -770,11 +1388,7 @@
                    supportedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
         }
 
-        function handleEnter(event) {
-            if (event.key === 'Enter') {
-                searchContracts();
-            }
-        }
+        // Removed old handleEnter - using handleChatEnter instead
 
         // Initialize when the page loads
         document.addEventListener('DOMContentLoaded', initializeApp);

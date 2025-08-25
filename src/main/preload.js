@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // File operations
   selectFile: () => ipcRenderer.invoke('select-file'),
   selectFiles: () => ipcRenderer.invoke('select-files'),
+  selectGoogleServiceAccountFile: () => ipcRenderer.invoke('select-google-service-account-file'),
   
   // Document operations
   processDocuments: (filePaths) => ipcRenderer.invoke('process-documents', filePaths),
@@ -28,6 +29,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Phase 2: Language Support
   getLanguageSupport: () => ipcRenderer.invoke('get-language-support'),
   addLanguageSupport: (languageCode) => ipcRenderer.invoke('add-language-support', languageCode),
+
+  // Phase 3: RAG Chat functionality
+  ragQuery: (query, conversationId, options) => ipcRenderer.invoke('rag-query', query, conversationId, options),
+  getConversationHistory: (conversationId) => ipcRenderer.invoke('get-conversation-history', conversationId),
+  getAllConversations: () => ipcRenderer.invoke('get-all-conversations'),
+  deleteConversation: (conversationId) => ipcRenderer.invoke('delete-conversation', conversationId),
+  clearAllConversations: () => ipcRenderer.invoke('clear-all-conversations'),
+  generateConversationId: () => ipcRenderer.invoke('generate-conversation-id'),
+
+  // Phase 3: Google Vision OCR Configuration (Simplified)
+  setGoogleVisionServiceAccount: (serviceAccountPath) => ipcRenderer.invoke('set-google-vision-service-account', serviceAccountPath),
+  getGoogleVisionInfo: () => ipcRenderer.invoke('get-google-vision-info'),
+  clearGoogleVisionServiceAccount: () => ipcRenderer.invoke('clear-google-vision-service-account'),
+  getOCRInfo: () => ipcRenderer.invoke('get-ocr-info'),
+  isOCRReady: () => ipcRenderer.invoke('is-ocr-ready'),
+  getOCRSettings: () => ipcRenderer.invoke('get-ocr-settings'),
+  updateOCRSettings: (settings) => ipcRenderer.invoke('update-ocr-settings', settings),
+  getLanguageSupport: () => ipcRenderer.invoke('get-language-support'),
   
   // Processing status listener
   onProcessingStatus: (callback) => ipcRenderer.on('processing-status', callback),

@@ -26,17 +26,17 @@ class DocumentService {
     // Initialize vector service
     this.initializeServices();
     
-    console.log('📄 DocumentService initialized with Phase 2 capabilities');
+    console.log('📄 DocumentService initialized with Phase 3 Hybrid OCR capabilities');
     console.log('📁 Documents stored at:', this.documentsPath);
   }
 
   async initializeServices() {
     try {
       await this.vectorService.initialize();
-      await this.ocrService.initialize();
-      console.log('✅ Phase 2 services initialized');
+      await this.ocrService.autoInitialize();
+      console.log('✅ Phase 3 services initialized (Google Vision OCR)');
     } catch (error) {
-      console.error('⚠️ Error initializing Phase 2 services:', error);
+      console.error('⚠️ Error initializing Phase 3 services:', error);
     }
   }
 
@@ -68,18 +68,64 @@ class DocumentService {
 
       // Extract text based on file type
       if (fileExt === '.pdf') {
-        extractedText = await this.extractTextFromPDF(buffer, filePath, fileName);
-      } else if (this.ocrService.isImageFile(fileName)) {
-        // Process image files with enhanced multi-language OCR
-        const ocrResult = await this.ocrService.extractTextFromImage(filePath);
-        extractedText = this.ocrService.cleanContractText(ocrResult.text, ocrResult.detectedLanguage);
+        const pdfResult = await this.extractTextFromPDF(buffer, filePath, fileName);
         
-        // Store OCR metadata including language detection
-        metadata.ocrConfidence = ocrResult.confidence;
-        metadata.wordCount = ocrResult.wordCount;
-        metadata.detectedLanguage = ocrResult.detectedLanguage;
-        metadata.hasHebrew = ocrResult.hasHebrew;
-        metadata.hasArabic = ocrResult.hasArabic;
+        // Check if the result is an OCR result object or just text
+        if (typeof pdfResult === 'object' && pdfResult.text) {
+          // This is a scanned PDF that was processed with OCR
+          extractedText = pdfResult.text; // Use raw text for better processing
+          
+          // Store OCR metadata for scanned PDFs
+          metadata.ocrConfidence = pdfResult.confidence;
+          metadata.wordCount = pdfResult.wordCount;
+          metadata.detectedLanguage = pdfResult.language;
+          metadata.hasHebrew = pdfResult.language === 'hebrew';
+          metadata.hasArabic = pdfResult.language === 'arabic';
+          metadata.ocrEngine = pdfResult.engine;
+          metadata.processingTime = pdfResult.processingTime;
+          metadata.pagesProcessed = pdfResult.pagesProcessed;
+          metadata.totalPages = pdfResult.totalPages;
+          metadata.isScannedPDF = true;
+          
+          console.log(`✅ Scanned PDF OCR processing completed for ${fileName}`);
+          console.log(`📊 Engine: ${pdfResult.engine || 'unknown'}, Confidence: ${pdfResult.confidence.toFixed(1)}%, Language: ${pdfResult.language}`);
+          console.log(`⏱️ Processing time: ${pdfResult.processingTime}ms, Pages: ${pdfResult.pagesProcessed}/${pdfResult.totalPages}`);
+        } else {
+          // Regular PDF with embedded text
+          extractedText = pdfResult;
+        }
+      } else if (this.isImageFile(fileName)) {
+        // Process image files with Google Vision OCR
+        console.log(`🖼️ Processing image file: ${fileName}`);
+        try {
+          const ocrResult = await this.ocrService.extractFromImage(filePath);
+          extractedText = ocrResult.text;
+          
+          // Store OCR metadata including language detection and engine info
+          metadata.ocrConfidence = ocrResult.confidence;
+          metadata.wordCount = ocrResult.wordCount;
+          metadata.detectedLanguage = ocrResult.language;
+          metadata.hasHebrew = ocrResult.language === 'hebrew';
+          metadata.hasArabic = ocrResult.language === 'arabic';
+          metadata.ocrEngine = ocrResult.engine;
+          metadata.processingTime = ocrResult.processingTime;
+          
+          console.log(`✅ OCR processing completed for ${fileName}`);
+          console.log(`📊 Engine: ${ocrResult.engine}, Confidence: ${ocrResult.confidence.toFixed(1)}%, Language: ${ocrResult.language}`);
+          
+        } catch (ocrError) {
+          console.error(`❌ OCR processing failed for ${fileName}:`, ocrError.message);
+          
+          // Still create the document record with error info
+          extractedText = `[OCR Processing Failed: ${ocrError.message}]\n\nPlease try:\n1. Using a higher resolution image\n2. Ensuring the image is clear and well-lit\n3. Converting to PNG or JPG format\n4. Checking that text in the image is legible`;
+          
+          metadata.ocrError = ocrError.message;
+          metadata.ocrConfidence = 0;
+          metadata.wordCount = 0;
+          metadata.detectedLanguage = 'unknown';
+          metadata.hasHebrew = false;
+          metadata.hasArabic = false;
+        }
       } else {
         throw new Error(`Unsupported file type: ${fileExt}`);
       }
@@ -150,18 +196,22 @@ class DocumentService {
       const isLikelyScanned = avgCharsPerPage < 100; // Less than 100 characters per page suggests scanned PDF
       
       if (isLikelyScanned && extractedText.length < 200) {
-        console.log(`🔍 Detected scanned PDF (${avgCharsPerPage.toFixed(1)} chars/page). Attempting OCR...`);
+        console.log(`🔍 Detected scanned PDF (${avgCharsPerPage.toFixed(1)} chars/page). Attempting Google Vision OCR on PDF...`);
         
         try {
-          // For scanned PDFs, we need to convert to images and OCR
-          // Since we don't have pdf-to-image converter yet, let's provide better error message
-          console.log('⚠️ Scanned PDF detected but PDF-to-image conversion not yet implemented');
-          console.log('💡 To process this Hebrew document, please convert it to images (PNG/JPG) and re-upload');
+          // Use Google Vision OCR for scanned PDFs
+          const ocrResult = await this.ocrService.extractFromPDF(filePath);
           
-          return extractedText + '\n\n[NOTE: This appears to be a scanned PDF. For better text extraction, please convert to image format and re-upload.]';
+          if (ocrResult && ocrResult.success && ocrResult.text && ocrResult.text.length > extractedText.length) {
+            console.log(`✅ PDF OCR successful: ${ocrResult.text.length} characters vs ${extractedText.length} from standard extraction`);
+            return ocrResult; // Return the full OCR result object
+          } else {
+            console.log('⚠️ PDF OCR did not improve results, using standard extraction');
+            return extractedText;
+          }
         } catch (ocrError) {
-          console.error('❌ OCR fallback failed:', ocrError);
-          return extractedText;
+          console.error('❌ PDF OCR failed:', ocrError.message);
+          return extractedText + '\n\n[NOTE: This appears to be a scanned PDF. OCR processing failed. For better text extraction, try converting to images (PNG/JPG) and re-upload.]';
         }
       }
       
@@ -170,6 +220,8 @@ class DocumentService {
       throw new Error(`PDF extraction failed: ${error.message}`);
     }
   }
+
+
 
   detectDocumentType(text) {
     const legalTerms = [
@@ -393,23 +445,40 @@ class DocumentService {
     }
   }
 
-  deleteDocument(documentId) {
+  async deleteDocument(documentId) {
     try {
+      console.log(`🗑️ Deleting document: ${documentId}`);
+      
       // Remove files
       const textFilePath = path.join(this.documentsPath, `${documentId}.txt`);
       const chunksFilePath = path.join(this.documentsPath, `${documentId}_chunks.json`);
       
-      if (fs.existsSync(textFilePath)) fs.unlinkSync(textFilePath);
-      if (fs.existsSync(chunksFilePath)) fs.unlinkSync(chunksFilePath);
+      if (fs.existsSync(textFilePath)) {
+        fs.unlinkSync(textFilePath);
+        console.log(`✅ Removed text file: ${documentId}.txt`);
+      }
+      if (fs.existsSync(chunksFilePath)) {
+        fs.unlinkSync(chunksFilePath);
+        console.log(`✅ Removed chunks file: ${documentId}_chunks.json`);
+      }
+
+      // Remove from vector database
+      try {
+        await this.vectorService.removeDocument(documentId);
+        console.log(`✅ Removed from vector database: ${documentId}`);
+      } catch (vectorError) {
+        console.warn(`⚠️ Could not remove from vector database: ${vectorError.message}`);
+      }
 
       // Remove from metadata
       const documents = this.getAllDocuments();
       const updatedDocuments = documents.filter(doc => doc.id !== documentId);
       this.store.set('documents', updatedDocuments);
-
+      
+      console.log(`✅ Document ${documentId} deleted successfully`);
       return true;
     } catch (error) {
-      console.error(`Error deleting document: ${error.message}`);
+      console.error(`❌ Error deleting document: ${error.message}`);
       return false;
     }
   }
@@ -557,6 +626,29 @@ class DocumentService {
 
   async getVectorStats() {
     return await this.vectorService.getStats();
+  }
+
+  // OCR Service methods - simplified for clean implementation  
+  async setGoogleVisionServiceAccount(serviceAccountPath) {
+    return await this.ocrService.initialize(serviceAccountPath);
+  }
+
+  getOCRInfo() {
+    return this.ocrService.getInfo();
+  }
+
+  isOCRReady() {
+    return this.ocrService.isReady();
+  }
+
+  clearGoogleVisionServiceAccount() {
+    this.ocrService.clearServiceAccount();
+  }
+
+  isImageFile(fileName) {
+    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'];
+    const ext = path.extname(fileName).toLowerCase();
+    return imageExtensions.includes(ext);
   }
 }
 

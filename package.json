@@ -1,7 +1,7 @@
 {
   "name": "contract-rag-manager",
-  "version": "1.1.0",
-  "description": "Smart Contract Management System with RAG Framework",
+  "version": "1.2.1",
+  "description": "AI-Powered Contract Analysis with Conversational RAG Interface",
   "author": "RandomWilder",
   "main": "src/main/main.js",
   "scripts": {
@@ -26,7 +26,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "publisherName": "Covenantrix",
@@ -38,7 +40,9 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64"]
+          "arch": [
+            "universal"
+          ]
         }
       ],
       "artifactName": "${productName}-${version}-mac.${ext}",
@@ -67,13 +71,15 @@
     ]
   },
   "dependencies": {
-    "electron-updater": "^6.6.2",
-    "pdf-parse": "^1.1.1",
+    "@google-cloud/vision": "^5.3.3",
     "electron-store": "^8.1.0",
-    "uuid": "^9.0.1",
+    "electron-updater": "^6.6.2",
     "openai": "^4.28.0",
+    "pdf-parse": "^1.1.1",
+    "pdf-poppler": "^0.2.1",
     "sharp": "^0.33.2",
-    "tesseract.js": "^5.0.4"
+    "tesseract.js": "^5.0.4",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "electron": "^25.3.0",

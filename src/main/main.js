@@ -2,9 +2,11 @@ const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const DocumentService = require('./services/documentService');
+const RAGService = require('./services/ragService');
 
 let mainWindow;
 let documentService;
+let ragService;
 
 // Configure auto-updater (only in production)
 if (!app.isPackaged) {
@@ -99,9 +101,14 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
-  // Initialize document service
+app.whenReady().then(async () => {
+  // Initialize services
   documentService = new DocumentService();
+  ragService = new RAGService();
+  
+  // Initialize services
+  await ragService.initialize();
+  
   setupIPCHandlers();
   createWindow();
 });
@@ -125,6 +132,24 @@ function setupIPCHandlers() {
     }
     
     return { success: true, filePaths: result.filePaths };
+  });
+
+  // Handle Google Service Account JSON file selection
+  ipcMain.handle('select-google-service-account-file', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'JSON Files', extensions: ['json'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      title: 'Select Google Vision Service Account JSON File'
+    });
+    
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+    
+    return { success: true, filePath: result.filePaths[0] };
   });
 
   // Process uploaded documents
@@ -159,7 +184,7 @@ function setupIPCHandlers() {
 
   // Delete document (now removes from vector database too)
   ipcMain.handle('delete-document', async (event, documentId) => {
-    return documentService.deleteDocument(documentId);
+    return await documentService.deleteDocument(documentId);
   });
 
   // API Key Management
@@ -190,14 +215,111 @@ function setupIPCHandlers() {
     };
   });
 
-  // Get OCR language support
-  ipcMain.handle('get-language-support', async () => {
-    return documentService.ocrService.getLanguageSupport();
+  // Get OCR info (simplified for clean OCR service)
+  ipcMain.handle('get-ocr-info', async () => {
+    return documentService.getOCRInfo();
   });
 
-  // Add language support
-  ipcMain.handle('add-language-support', async (event, languageCode) => {
-    return await documentService.ocrService.addLanguageSupport(languageCode);
+  // Check if OCR is ready
+  ipcMain.handle('is-ocr-ready', async () => {
+    return documentService.isOCRReady();
+  });
+
+  // Language support (simplified - Google Vision supports these by default)
+  ipcMain.handle('get-language-support', async () => {
+    return {
+      supportedLanguages: ['hebrew', 'arabic', 'english'],
+      defaultLanguages: ['he', 'ar', 'en'],
+      isMultiLanguage: true
+    };
+  });
+
+  // Phase 3: RAG Chat functionality
+  ipcMain.handle('rag-query', async (event, query, conversationId, options) => {
+    try {
+      return await ragService.queryDocuments(query, conversationId, options);
+    } catch (error) {
+      console.error('RAG query error:', error);
+      return {
+        response: 'Sorry, I encountered an error processing your question. Please try again.',
+        sources: [],
+        conversationId: conversationId || ragService.generateConversationId(),
+        error: error.message
+      };
+    }
+  });
+
+  // Get conversation history
+  ipcMain.handle('get-conversation-history', async (event, conversationId) => {
+    return ragService.getConversationHistory(conversationId);
+  });
+
+  // Get all conversations
+  ipcMain.handle('get-all-conversations', async () => {
+    return ragService.getAllConversations();
+  });
+
+  // Delete conversation
+  ipcMain.handle('delete-conversation', async (event, conversationId) => {
+    return ragService.deleteConversation(conversationId);
+  });
+
+  // Clear all conversations
+  ipcMain.handle('clear-all-conversations', async () => {
+    return ragService.clearAllConversations();
+  });
+
+  // Generate new conversation ID
+  ipcMain.handle('generate-conversation-id', async () => {
+    return ragService.generateConversationId();
+  });
+
+  // Phase 3: Google Vision OCR Configuration (Simplified)
+  ipcMain.handle('set-google-vision-service-account', async (event, serviceAccountPath) => {
+    try {
+      const result = await documentService.setGoogleVisionServiceAccount(serviceAccountPath);
+      
+      // Get project info for UI feedback
+      const ocrInfo = documentService.getOCRInfo();
+      
+      return { 
+        success: true, 
+        projectId: ocrInfo.projectId || 'unknown',
+        isInitialized: ocrInfo.isInitialized 
+      };
+    } catch (error) {
+      console.error('Error setting Google Vision service account:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('get-google-vision-info', async () => {
+    return documentService.getOCRInfo();
+  });
+
+  ipcMain.handle('clear-google-vision-service-account', async () => {
+    try {
+      documentService.clearGoogleVisionServiceAccount();
+      return { success: true };
+    } catch (error) {
+      console.error('Error clearing Google Vision service account:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('get-ocr-settings', async () => {
+    return {
+      primaryEngine: 'google_vision',
+      enableFallback: false,
+      isReady: documentService.isOCRReady(),
+      supportedLanguages: ['hebrew', 'arabic', 'english']
+    };
+  });
+
+  ipcMain.handle('update-ocr-settings', async (event, settings) => {
+    // For simplified OCR service, just acknowledge the update
+    console.log('⚙️ OCR settings updated (simplified):', settings);
+    return { success: true };
   });
 }
 

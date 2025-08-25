@@ -1,328 +1,343 @@
-const Tesseract = require('tesseract.js');
-const sharp = require('sharp');
+const { ImageAnnotatorClient } = require('@google-cloud/vision');
 const fs = require('fs');
 const path = require('path');
+const pdfPoppler = require('pdf-poppler');
+const { app } = require('electron');
+const Store = require('electron-store');
 
+/**
+ * Clean, focused OCR Service using Google Vision API
+ * Handles both images and PDFs with Hebrew/Arabic support
+ */
 class OCRService {
   constructor() {
-    this.scheduler = null;
-    this.workers = {};
+    this.client = null;
     this.isInitialized = false;
+    this.store = new Store({ name: 'ocr-settings', encryptionKey: 'contract-rag-ocr' });
     
-    // Supported languages with their Tesseract codes
-    this.supportedLanguages = {
-      'english': 'eng',
-      'hebrew': 'heb', 
-      'arabic': 'ara',
-      'spanish': 'spa',
-      'french': 'fra',
-      'german': 'deu',
-      'russian': 'rus',
-      'chinese_simplified': 'chi_sim',
-      'chinese_traditional': 'chi_tra',
-      'japanese': 'jpn',
-      'korean': 'kor'
-    };
-    
-    console.log('🔍 OCRService initialized with multi-language support');
+    console.log('🔍 OCR Service initialized');
   }
 
-  async initialize() {
+  /**
+   * Initialize Google Vision API with service account JSON
+   * @param {string} serviceAccountPath - Path to service account JSON file
+   */
+  async initialize(serviceAccountPath) {
     try {
-      // Create Tesseract scheduler for better performance
-      this.scheduler = Tesseract.createScheduler();
-      
-      // Initialize multi-language worker (English + Hebrew by default)
-      // This covers most common use cases including Hebrew documents
-      const multiLangWorker = await Tesseract.createWorker(['eng', 'heb']);
-      this.scheduler.addWorker(multiLangWorker);
-      this.workers['multi'] = multiLangWorker;
-      
-      this.isInitialized = true;
-      console.log('✅ OCR multi-language worker initialized (English + Hebrew)');
-      return true;
-    } catch (error) {
-      console.error('❌ Error initializing OCR service:', error);
-      console.log('ℹ️ Falling back to English-only OCR...');
-      
-      try {
-        // Fallback to English only if multi-language fails
-        const englishWorker = await Tesseract.createWorker('eng');
-        this.scheduler.addWorker(englishWorker);
-        this.workers['eng'] = englishWorker;
-        this.isInitialized = true;
-        console.log('✅ OCR English worker initialized as fallback');
-        return true;
-      } catch (fallbackError) {
-        console.error('❌ OCR initialization completely failed:', fallbackError);
-        return false;
-      }
-    }
-  }
-
-  async preprocessImage(imagePath) {
-    try {
-      // Create a preprocessed version of the image for better OCR accuracy
-      const outputPath = imagePath.replace(path.extname(imagePath), '_processed.png');
-      
-      await sharp(imagePath)
-        .greyscale()                    // Convert to grayscale
-        .normalize()                    // Normalize contrast
-        .sharpen()                     // Sharpen for better text recognition
-        .resize(null, 2000, {          // Upscale if needed (max height 2000px)
-          withoutEnlargement: true
-        })
-        .png({ quality: 100 })         // Save as high-quality PNG
-        .toFile(outputPath);
-
-      return outputPath;
-    } catch (error) {
-      console.error('❌ Error preprocessing image:', error);
-      return imagePath; // Return original if preprocessing fails
-    }
-  }
-
-  async extractTextFromImage(imagePath, languages = null) {
-    try {
-      if (!this.isInitialized) {
-        await this.initialize();
+      if (!fs.existsSync(serviceAccountPath)) {
+        throw new Error('Service account JSON file not found');
       }
 
-      console.log(`🔍 Processing image with OCR: ${path.basename(imagePath)}`);
-
-      // Preprocess image for better OCR accuracy
-      const processedPath = await this.preprocessImage(imagePath);
-
-      // Perform OCR with multi-language support
-      const result = await this.scheduler.addJob('recognize', processedPath, {
-        logger: m => console.log(`OCR Progress: ${m.status} ${m.progress ? Math.round(m.progress * 100) + '%' : ''}`)
+      // Initialize Google Vision client
+      this.client = new ImageAnnotatorClient({
+        keyFilename: serviceAccountPath
       });
 
-      // Clean up processed file if it was created
-      if (processedPath !== imagePath && fs.existsSync(processedPath)) {
-        fs.unlinkSync(processedPath);
+      // Test the connection
+      console.log('🔍 Testing Google Vision API connection...');
+      await this.client.getProjectId();
+      
+      this.isInitialized = true;
+      this.store.set('serviceAccountPath', serviceAccountPath);
+      
+      console.log('✅ Google Vision API initialized successfully');
+      return true;
+
+    } catch (error) {
+      console.error('❌ Failed to initialize Google Vision API:', error.message);
+      this.isInitialized = false;
+      throw new Error(`Google Vision initialization failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Check if OCR service is ready
+   */
+  isReady() {
+    return this.isInitialized && this.client;
+  }
+
+  /**
+   * Extract text from an image using Google Vision
+   * @param {string} imagePath - Path to image file
+   * @returns {Object} OCR result with text, confidence, and metadata
+   */
+  async extractFromImage(imagePath) {
+    if (!this.isReady()) {
+      throw new Error('OCR service not initialized. Please configure Google Vision API first.');
+    }
+
+    const startTime = Date.now();
+
+    try {
+      console.log(`🔍 Processing image: ${path.basename(imagePath)}`);
+
+      // Configure request with language hints for Hebrew/Arabic
+      const request = {
+        image: { content: fs.readFileSync(imagePath).toString('base64') },
+        features: [{ type: 'DOCUMENT_TEXT_DETECTION' }], // Better for documents than TEXT_DETECTION
+        imageContext: {
+          languageHints: ['he', 'ar', 'en'] // Hebrew, Arabic, English
+        }
+      };
+
+      // Call Google Vision API
+      const [result] = await this.client.annotateImage(request);
+
+      if (result.error) {
+        throw new Error(`Google Vision error: ${result.error.message}`);
       }
 
-      // Process the OCR result
-      const extractedText = result.data.text;
-      const confidence = result.data.confidence;
-
-      // Detect if text contains Hebrew characters
-      const hasHebrew = /[\u0590-\u05FF]/.test(extractedText);
-      const hasArabic = /[\u0600-\u06FF]/.test(extractedText);
+      const fullTextAnnotation = result.fullTextAnnotation;
       
-      let detectedLanguage = 'unknown';
-      if (hasHebrew) detectedLanguage = 'hebrew';
-      else if (hasArabic) detectedLanguage = 'arabic';
-      else if (/[a-zA-Z]/.test(extractedText)) detectedLanguage = 'english';
+      if (!fullTextAnnotation || !fullTextAnnotation.text) {
+        console.warn('⚠️ No text found in image');
+        return this.createEmptyResult();
+      }
 
-      console.log(`✅ OCR completed with ${confidence.toFixed(1)}% confidence`);
-      console.log(`📝 Extracted ${extractedText.length} characters`);
-      console.log(`🌐 Detected language: ${detectedLanguage}`);
+      const text = fullTextAnnotation.text;
+      const processingTime = Date.now() - startTime;
+      
+      // Calculate confidence from text annotations
+      const confidence = this.calculateConfidence(result.textAnnotations);
+      
+      console.log(`✅ Extracted ${text.length} characters in ${processingTime}ms`);
 
       return {
-        text: extractedText,
+        text: text,
         confidence: confidence,
-        wordCount: extractedText.split(/\s+/).filter(word => word.length > 0).length,
-        detectedLanguage: detectedLanguage,
-        hasHebrew: hasHebrew,
-        hasArabic: hasArabic
+        language: this.detectLanguage(text),
+        wordCount: text.split(/\s+/).filter(w => w.length > 0).length,
+        processingTime: processingTime,
+        engine: 'google_vision',
+        success: true
       };
+
     } catch (error) {
-      console.error('❌ Error in OCR processing:', error);
-      throw error;
+      console.error('❌ Image OCR failed:', error.message);
+      throw new Error(`Image OCR failed: ${error.message}`);
     }
   }
 
-  async extractTextFromPDF(pdfBuffer) {
-    try {
-      // This method converts PDF pages to images and then processes with OCR
-      // For now, we'll focus on image-based OCR, but this can be extended
-      console.log('📄 PDF OCR processing not yet implemented');
-      
-      return {
-        text: '',
-        confidence: 0,
-        wordCount: 0,
-        error: 'PDF OCR not implemented yet - use image files for OCR'
-      };
-    } catch (error) {
-      console.error('❌ Error in PDF OCR:', error);
-      throw error;
+  /**
+   * Extract text from PDF by converting to images first
+   * @param {string} pdfPath - Path to PDF file
+   * @returns {Object} OCR result with combined text from all pages
+   */
+  async extractFromPDF(pdfPath) {
+    if (!this.isReady()) {
+      throw new Error('OCR service not initialized. Please configure Google Vision API first.');
     }
-  }
 
-  async processMultipleImages(imagePaths) {
+    const startTime = Date.now();
+    const tempDir = path.join(app.getPath('temp'), 'contract-ocr-' + Date.now());
+    
     try {
-      const results = [];
-      
-      for (const imagePath of imagePaths) {
-        try {
-          const result = await this.extractTextFromImage(imagePath);
-          results.push({
-            file: path.basename(imagePath),
-            ...result
-          });
-        } catch (error) {
-          results.push({
-            file: path.basename(imagePath),
-            error: error.message,
-            text: '',
-            confidence: 0
-          });
+      console.log(`📄 Processing PDF: ${path.basename(pdfPath)}`);
+
+      // Create temp directory
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      // Convert PDF to images
+      console.log('🔄 Converting PDF pages to images...');
+      const convertOptions = {
+        format: 'png',
+        out_dir: tempDir,
+        out_prefix: 'page',
+        page: null, // Convert all pages
+        resolution: 200 // Good balance between quality and processing time
+      };
+
+      const convertStartTime = Date.now();
+      const info = await pdfPoppler.info(pdfPath);
+      await pdfPoppler.convert(pdfPath, convertOptions);
+      const conversionTime = Date.now() - convertStartTime;
+
+      console.log(`✅ Converted ${info.pages} PDF pages in ${conversionTime}ms`);
+
+      // Process each page image with OCR
+      let combinedText = '';
+      let totalConfidence = 0;
+      let totalWords = 0;
+      let successfulPages = 0;
+      let ocrTime = 0;
+
+      for (let pageNum = 1; pageNum <= info.pages; pageNum++) {
+        const imagePath = path.join(tempDir, `page-${pageNum}.png`);
+        
+        if (fs.existsSync(imagePath)) {
+          try {
+            console.log(`📄 Processing page ${pageNum}/${info.pages}...`);
+            
+            const pageResult = await this.extractFromImage(imagePath);
+            
+            if (pageResult.success && pageResult.text.trim().length > 0) {
+              combinedText += pageResult.text + '\n\n';
+              totalConfidence += pageResult.confidence;
+              totalWords += pageResult.wordCount;
+              ocrTime += pageResult.processingTime;
+              successfulPages++;
+            }
+
+          } catch (pageError) {
+            console.warn(`⚠️ Failed to process page ${pageNum}:`, pageError.message);
+          }
         }
       }
 
-      return results;
-    } catch (error) {
-      console.error('❌ Error processing multiple images:', error);
-      return [];
-    }
-  }
+      // Cleanup temp files
+      await this.cleanupTempDir(tempDir);
 
-  // Enhanced multi-language contract text cleaning
-  cleanContractText(rawText, detectedLanguage = 'unknown') {
-    try {
-      let cleanText = rawText;
+      const totalTime = Date.now() - startTime;
+      const avgConfidence = successfulPages > 0 ? totalConfidence / successfulPages : 0;
 
-      // Apply language-specific cleaning
-      if (detectedLanguage === 'hebrew' || /[\u0590-\u05FF]/.test(rawText)) {
-        cleanText = this.cleanHebrewText(cleanText);
-      } else if (detectedLanguage === 'arabic' || /[\u0600-\u06FF]/.test(rawText)) {
-        cleanText = this.cleanArabicText(cleanText);
-      } else {
-        // Default English/Latin script cleaning
-        cleanText = this.cleanEnglishText(cleanText);
+      if (successfulPages === 0) {
+        console.warn('❌ No text extracted from any PDF pages');
+        return this.createEmptyResult();
       }
 
-      // Universal cleaning (all languages)
-      cleanText = cleanText
-        // Fix spacing issues
-        .replace(/\s+/g, ' ')                         // Multiple spaces to single
-        .replace(/\n\s*\n/g, '\n\n')                 // Clean paragraph breaks
-        
-        // Clean up line breaks
-        .replace(/(\w)-\s*\n\s*(\w)/g, '$1$2')       // Fix hyphenated words across lines
-        
-        .trim();
+      console.log(`✅ PDF OCR completed: ${combinedText.length} characters from ${successfulPages}/${info.pages} pages`);
+      console.log(`📊 Average confidence: ${avgConfidence.toFixed(1)}%, Total time: ${totalTime}ms`);
 
-      return cleanText;
+      return {
+        text: combinedText.trim(),
+        confidence: avgConfidence,
+        language: this.detectLanguage(combinedText),
+        wordCount: totalWords,
+        processingTime: totalTime,
+        conversionTime: conversionTime,
+        ocrTime: ocrTime,
+        pagesProcessed: successfulPages,
+        totalPages: info.pages,
+        engine: 'google_vision',
+        success: true
+      };
+
     } catch (error) {
-      console.error('❌ Error cleaning contract text:', error);
-      return rawText;
+      // Cleanup on error
+      await this.cleanupTempDir(tempDir);
+      
+      console.error('❌ PDF OCR failed:', error.message);
+      throw new Error(`PDF OCR failed: ${error.message}`);
     }
   }
 
-  cleanHebrewText(text) {
-    return text
-      // Fix common Hebrew OCR errors
-      .replace(/[״״]/g, '"')                        // Normalize Hebrew quotes
-      .replace(/[׳׳]/g, "'")                        // Normalize Hebrew apostrophes
-      .replace(/־/g, '-')                           // Normalize Hebrew hyphen
-      
-      // Fix Hebrew punctuation spacing
-      .replace(/\s+([.,;:!?״׳])/g, '$1')           // Remove space before punctuation
-      .replace(/([.,;:!?״׳])\s*([א-ת])/g, '$1 $2') // Add space after punctuation
-      
-      // Preserve Hebrew text direction markers
-      .replace(/\u200F/g, '')                       // Remove Right-to-Left marks that might cause issues
-      .replace(/\u200E/g, '');                      // Remove Left-to-Right marks
+  /**
+   * Calculate confidence score from text annotations
+   */
+  calculateConfidence(textAnnotations) {
+    if (!textAnnotations || textAnnotations.length === 0) return 0;
+    
+    // Skip the first annotation (full text) and calculate from word-level annotations
+    const wordAnnotations = textAnnotations.slice(1);
+    if (wordAnnotations.length === 0) return 85; // Default for document text
+    
+    const totalConfidence = wordAnnotations.reduce((sum, annotation) => {
+      return sum + (annotation.confidence || 0.85);
+    }, 0);
+    
+    return Math.round((totalConfidence / wordAnnotations.length) * 100);
   }
 
-  cleanArabicText(text) {
-    return text
-      // Fix common Arabic OCR errors
-      .replace(/["""]/g, '"')                       // Normalize quotes
-      .replace(/[''']/g, "'")                       // Normalize apostrophes
-      
-      // Fix Arabic punctuation spacing
-      .replace(/\s+([.,;:!?])/g, '$1')             // Remove space before punctuation
-      .replace(/([.,;:!?])\s*([أ-ي])/g, '$1 $2')   // Add space after punctuation
-      
-      // Clean up Arabic text direction
-      .replace(/\u200F/g, '')                       // Remove Right-to-Left marks
-      .replace(/\u200E/g, '');                      // Remove Left-to-Right marks
+  /**
+   * Detect primary language in text
+   */
+  detectLanguage(text) {
+    if (/[\u0590-\u05FF]/.test(text)) return 'hebrew';
+    if (/[\u0600-\u06FF]/.test(text)) return 'arabic';
+    return 'english';
   }
 
-  cleanEnglishText(text) {
-    return text
-      // Fix common OCR errors in legal documents
-      .replace(/\b[Il]\b/g, 'I')                    // Fix standalone I/l confusion
-      .replace(/\b[0O]f\b/g, 'of')                  // Fix 0f -> of
-      .replace(/\btne\b/g, 'the')                   // Fix tne -> the
-      .replace(/\band\b/gi, 'and')                  // Normalize 'and'
-      .replace(/\bcontract\b/gi, 'contract')        // Normalize 'contract'
-      
-      // Fix punctuation
-      .replace(/\s+([.,;:!?])/g, '$1')             // Remove space before punctuation
-      .replace(/([.,;:!?])\s*([a-zA-Z])/g, '$1 $2') // Add space after punctuation
-      
-      // Join broken sentences (English-specific)
-      .replace(/\n\s*([a-z])/g, ' $1');            // Join broken sentences
-  }
-
-  async terminate() {
-    try {
-      if (this.scheduler) {
-        await this.scheduler.terminate();
-        this.scheduler = null;
-        this.workers = {};
-        this.isInitialized = false;
-        console.log('🔍 OCR service terminated');
-      }
-    } catch (error) {
-      console.error('❌ Error terminating OCR service:', error);
-    }
-  }
-
-  // Get available language support info (IPC-safe)
-  getLanguageSupport() {
+  /**
+   * Create empty result for cases with no text
+   */
+  createEmptyResult() {
     return {
-      initialized: this.isInitialized,
-      supportedLanguages: this.supportedLanguages ? Object.keys(this.supportedLanguages) : ['english'],
-      activeWorkers: this.workers ? Object.keys(this.workers) : [],
-      hasHebrewSupport: !!(this.workers && (this.workers['multi'] || this.workers['heb'])),
-      hasMultiLanguageSupport: !!(this.workers && this.workers['multi'])
+      text: '',
+      confidence: 0,
+      language: 'unknown',
+      wordCount: 0,
+      processingTime: 0,
+      engine: 'google_vision',
+      success: false
     };
   }
 
-  // Add specific language worker if needed
-  async addLanguageSupport(languageCode) {
+  /**
+   * Clean up temporary directory and files
+   */
+  async cleanupTempDir(tempDir) {
     try {
-      if (this.workers[languageCode]) {
-        console.log(`Language ${languageCode} already supported`);
-        return true;
+      if (fs.existsSync(tempDir)) {
+        const files = fs.readdirSync(tempDir);
+        for (const file of files) {
+          fs.unlinkSync(path.join(tempDir, file));
+        }
+        fs.rmdirSync(tempDir);
+        console.log('🧹 Cleaned up temporary files');
       }
+    } catch (error) {
+      console.warn('⚠️ Cleanup warning:', error.message);
+    }
+  }
 
-      const worker = await Tesseract.createWorker(languageCode);
-      this.scheduler.addWorker(worker);
-      this.workers[languageCode] = worker;
-      
-      console.log(`✅ Added ${languageCode} language support`);
+  /**
+   * Get service configuration info
+   */
+  getInfo() {
+    const serviceAccountPath = this.store.get('serviceAccountPath');
+    let projectId = 'unknown';
+    
+    // Try to get project ID from service account if available
+    if (serviceAccountPath && fs.existsSync(serviceAccountPath)) {
+      try {
+        const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+        projectId = serviceAccount.project_id || 'unknown';
+      } catch (error) {
+        console.warn('⚠️ Could not read project ID from service account');
+      }
+    }
+    
+    return {
+      isInitialized: this.isInitialized,
+      isConfigured: !!serviceAccountPath && this.isInitialized,
+      hasServiceAccount: !!serviceAccountPath,
+      serviceAccountPath: serviceAccountPath || null,
+      projectId: projectId,
+      supportedFormats: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'pdf'],
+      supportedLanguages: ['hebrew', 'arabic', 'english']
+    };
+  }
+
+  /**
+   * Auto-initialize from stored service account if available
+   */
+  async autoInitialize() {
+    const serviceAccountPath = this.store.get('serviceAccountPath');
+    
+    if (serviceAccountPath && fs.existsSync(serviceAccountPath)) {
+      try {
+        await this.initialize(serviceAccountPath);
       return true;
     } catch (error) {
-      console.error(`❌ Error adding ${languageCode} support:`, error);
+        console.warn('⚠️ Auto-initialization failed:', error.message);
       return false;
     }
   }
 
-  // Check if file is an image that can be processed
-  isImageFile(filePath) {
-    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp'];
-    const ext = path.extname(filePath).toLowerCase();
-    return imageExtensions.includes(ext);
+    return false;
   }
 
-  // Get supported file types
-  getSupportedImageTypes() {
-    return [
-      { name: 'PNG Images', extensions: ['png'] },
-      { name: 'JPEG Images', extensions: ['jpg', 'jpeg'] },
-      { name: 'TIFF Images', extensions: ['tiff', 'tif'] },
-      { name: 'BMP Images', extensions: ['bmp'] },
-      { name: 'GIF Images', extensions: ['gif'] },
-      { name: 'WebP Images', extensions: ['webp'] }
-    ];
+  /**
+   * Clear stored service account configuration
+   */
+  clearServiceAccount() {
+    this.client = null;
+    this.isInitialized = false;
+    this.store.delete('serviceAccountPath');
+    console.log('🗑️ Google Vision service account cleared');
   }
 }
 

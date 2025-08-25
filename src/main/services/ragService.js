@@ -1,442 +1,357 @@
-const fs = require('fs').promises;
-const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
-const { OpenAI } = require('openai');
-const axios = require('axios');
-const pdfParse = require('pdf-parse');
-const mammoth = require('mammoth');
+const OpenAI = require('openai');
+const Store = require('electron-store');
+const VectorService = require('./vectorService');
+const DocumentService = require('./documentService');
 
 class RAGService {
   constructor() {
-    this.dbPath = path.join(__dirname, '../../data/contracts.db');
-    this.db = null;
     this.openai = null;
-    this.anthropicKey = null;
-    this.initPromise = this.initialize();
+    this.vectorService = new VectorService();
+    this.documentService = new DocumentService();
+    
+    // Settings store for configurations
+    this.settingsStore = new Store({
+      name: 'settings',
+      encryptionKey: 'covenantrix-settings-key-v1'
+    });
+
+    // Conversation store for chat history
+    this.conversationStore = new Store({
+      name: 'conversations',
+      encryptionKey: 'covenantrix-conversations-key-v1'
+    });
+    
+    console.log('🤖 RAGService initialized for conversational contract analysis');
   }
 
   async initialize() {
-    // Ensure data directory exists
-    const dataDir = path.dirname(this.dbPath);
-    await fs.mkdir(dataDir, { recursive: true });
-
-    // Initialize SQLite database
-    await this.initDatabase();
-    
-    // Initialize API keys (you'll need to set these via settings)
-    // For now, we'll use environment variables or settings file
-    this.loadApiKeys();
-  }
-
-  async initDatabase() {
-    return new Promise((resolve, reject) => {
-      this.db = new sqlite3.Database(this.dbPath, (err) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
-        // Create tables
-        const createTables = `
-          CREATE TABLE IF NOT EXISTS contracts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename TEXT NOT NULL,
-            filepath TEXT NOT NULL,
-            content TEXT NOT NULL,
-            metadata TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-          );
-
-          CREATE TABLE IF NOT EXISTS chunks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            contract_id INTEGER,
-            chunk_text TEXT NOT NULL,
-            chunk_type TEXT,
-            embedding BLOB,
-            metadata TEXT,
-            page_number INTEGER,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (contract_id) REFERENCES contracts (id)
-          );
-
-          CREATE INDEX IF NOT EXISTS idx_contract_filename ON contracts(filename);
-          CREATE INDEX IF NOT EXISTS idx_chunk_contract ON chunks(contract_id);
-        `;
-
-        this.db.exec(createTables, (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-    });
-  }
-
-  loadApiKeys() {
-    // In production, load from secure settings
-    // For development, use environment variables
-    if (process.env.OPENAI_API_KEY) {
-      this.openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      });
-    }
-    
-    this.anthropicKey = process.env.ANTHROPIC_API_KEY;
-  }
-
-  async processDocument(filePath) {
-    await this.initPromise;
-    
-    const filename = path.basename(filePath);
-    const ext = path.extname(filePath).toLowerCase();
-    
-    let content = '';
-    let metadata = {};
-
     try {
-      // Extract text based on file type
-      if (ext === '.pdf') {
-        const buffer = await fs.readFile(filePath);
-        const pdfData = await pdfParse(buffer);
-        content = pdfData.text;
-        metadata.pageCount = pdfData.numpages;
-      } else if (ext === '.docx') {
-        const result = await mammoth.extractRawText({ path: filePath });
-        content = result.value;
-        metadata.warnings = result.messages;
-      } else if (ext === '.txt') {
-        content = await fs.readFile(filePath, 'utf-8');
-      } else {
-        throw new Error(`Unsupported file type: ${ext}`);
+      await this.vectorService.initialize();
+      
+      // Initialize OpenAI if API key exists
+      const apiKey = this.settingsStore.get('openai_api_key');
+      if (apiKey) {
+        await this.setupOpenAI(apiKey);
       }
-
-      // Extract contract-specific metadata
-      metadata = { ...metadata, ...this.extractContractMetadata(content) };
-
-      // Store in database
-      const contractId = await this.storeContract(filename, filePath, content, metadata);
       
-      // Create smart chunks
-      const chunks = this.createSmartChunks(content, metadata);
-      
-      // Generate embeddings and store chunks
-      await this.storeChunks(contractId, chunks);
-
-      return {
-        success: true,
-        contractId,
-        filename,
-        chunkCount: chunks.length,
-        metadata
-      };
-
+      console.log('✅ RAG Service initialized successfully');
+      return true;
     } catch (error) {
-      console.error('Document processing error:', error);
-      return {
-        success: false,
-        error: error.message,
-        filename
-      };
+      console.error('❌ Error initializing RAG Service:', error);
+      return false;
     }
   }
 
-  extractContractMetadata(content) {
-    const metadata = {};
-    
-    // Extract parties (simplified pattern matching)
-    const partyPatterns = [
-      /between\s+([^,\n]+)\s+(?:,\s*)?(?:a\s+.+?company)?(?:\s+\([^)]+\))?\s+and\s+([^,\n]+)/i,
-      /this\s+agreement\s+is\s+made\s+between\s+([^,\n]+)\s+and\s+([^,\n]+)/i
-    ];
-    
-    for (const pattern of partyPatterns) {
-      const match = content.match(pattern);
-      if (match) {
-        metadata.party1 = match[1].trim();
-        metadata.party2 = match[2].trim();
-        break;
-      }
+  async setupOpenAI(apiKey) {
+    try {
+      this.openai = new OpenAI({ apiKey });
+      
+      // Test the connection
+      await this.openai.models.list();
+      console.log('✅ OpenAI client initialized for RAG');
+      return true;
+    } catch (error) {
+      console.error('❌ OpenAI setup failed:', error);
+      return false;
     }
+  }
 
-    // Extract dates
-    const datePattern = /(?:dated?\s+|effective\s+date\s*:?\s*)([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i;
-    const dateMatch = content.match(datePattern);
-    if (dateMatch) {
-      metadata.effectiveDate = dateMatch[1];
-    }
+  // Generate contract-aware prompts based on query type
+  generatePrompt(query, context, queryType = 'general') {
+    const baseInstructions = `You are Covenantrix, an expert legal document analyst specializing in contract analysis. You help users understand their legal documents through intelligent analysis.
 
-    // Extract contract type
-    const typePatterns = {
-      'Employment Agreement': /employment\s+agreement/i,
-      'Service Agreement': /service\s+agreement/i,
-      'Lease Agreement': /lease\s+agreement|rental\s+agreement/i,
-      'Purchase Agreement': /purchase\s+agreement|sale\s+agreement/i,
-      'NDA': /non.disclosure\s+agreement|confidentiality\s+agreement/i,
+CONTEXT: You have access to relevant sections from the user's uploaded legal documents shown below.
+
+INSTRUCTIONS:
+- Provide accurate, helpful analysis based ONLY on the provided document context
+- If information isn't in the context, clearly state "I don't see this information in your uploaded documents"
+- Always cite which document section you're referencing
+- For Hebrew/Arabic content, preserve the original text direction and formatting
+- Be professional but conversational
+- Focus on practical legal insights
+
+`;
+
+    const querySpecificInstructions = {
+      'general': 'Answer the user\'s question comprehensively using the document context.',
+      'parties': 'Identify and analyze the parties mentioned in the contracts, their roles, and relationships.',
+      'terms': 'Focus on contract terms, conditions, and key provisions.',
+      'dates': 'Identify and analyze important dates, deadlines, and time-sensitive clauses.',
+      'liability': 'Analyze liability, indemnification, and risk allocation clauses.',
+      'termination': 'Focus on termination conditions, notice requirements, and end-of-contract provisions.',
+      'payment': 'Analyze payment terms, amounts, schedules, and financial obligations.',
+      'confidentiality': 'Focus on confidentiality, non-disclosure, and privacy provisions.'
     };
 
-    for (const [type, pattern] of Object.entries(typePatterns)) {
-      if (pattern.test(content)) {
-        metadata.contractType = type;
-        break;
-      }
-    }
+    const instruction = querySpecificInstructions[queryType] || querySpecificInstructions['general'];
 
-    return metadata;
+    return `${baseInstructions}
+
+SPECIFIC TASK: ${instruction}
+
+DOCUMENT CONTEXT:
+${context}
+
+USER QUESTION: ${query}
+
+RESPONSE:`;
   }
 
-  createSmartChunks(content, metadata) {
-    const chunks = [];
+  // Detect query intent for better prompt selection
+  detectQueryType(query) {
+    const queryLower = query.toLowerCase();
     
-    // Split by common contract sections
-    const sectionPatterns = [
-      /(?:^|\n)\s*(?:\d+\.?\s*)?(?:ARTICLE|SECTION|CLAUSE)\s+[IVX\d]+[.:]\s*([^\n]+)/gim,
-      /(?:^|\n)\s*(?:\d+\.?\s*)([A-Z][A-Z\s]{5,}[.:]\s*)/gm,
-      /(?:^|\n)\s*\(([a-z])\)\s*/gm
-    ];
-
-    let lastIndex = 0;
-    const sections = [];
-
-    // Find section boundaries
-    for (const pattern of sectionPatterns) {
-      let match;
-      while ((match = pattern.exec(content)) !== null) {
-        sections.push({
-          start: match.index,
-          title: match[1] || match[0].trim(),
-          type: 'section'
-        });
-      }
+    if (queryLower.includes('parties') || queryLower.includes('who') || queryLower.includes('entity') || queryLower.includes('company')) {
+      return 'parties';
+    } else if (queryLower.includes('payment') || queryLower.includes('money') || queryLower.includes('cost') || queryLower.includes('fee')) {
+      return 'payment';
+    } else if (queryLower.includes('date') || queryLower.includes('when') || queryLower.includes('deadline') || queryLower.includes('expire')) {
+      return 'dates';
+    } else if (queryLower.includes('terminate') || queryLower.includes('end') || queryLower.includes('cancel')) {
+      return 'termination';
+    } else if (queryLower.includes('liability') || queryLower.includes('responsible') || queryLower.includes('indemnif')) {
+      return 'liability';
+    } else if (queryLower.includes('confidential') || queryLower.includes('secret') || queryLower.includes('disclosure')) {
+      return 'confidentiality';
+    } else if (queryLower.includes('term') || queryLower.includes('condition') || queryLower.includes('clause')) {
+      return 'terms';
     }
-
-    sections.sort((a, b) => a.start - b.start);
-
-    // Create chunks based on sections
-    for (let i = 0; i < sections.length; i++) {
-      const section = sections[i];
-      const nextSection = sections[i + 1];
-      const endIndex = nextSection ? nextSection.start : content.length;
-      
-      const sectionContent = content.slice(section.start, endIndex);
-      
-      if (sectionContent.length > 100) { // Only create chunks for substantial content
-        chunks.push({
-          text: sectionContent.trim(),
-          type: 'section',
-          title: section.title,
-          metadata: {
-            sectionIndex: i,
-            wordCount: sectionContent.split(/\s+/).length
-          }
-        });
-      }
-    }
-
-    // If no sections found, create paragraph-based chunks
-    if (chunks.length === 0) {
-      const paragraphs = content.split(/\n\s*\n/);
-      paragraphs.forEach((para, index) => {
-        if (para.trim().length > 100) {
-          chunks.push({
-            text: para.trim(),
-            type: 'paragraph',
-            metadata: {
-              paragraphIndex: index,
-              wordCount: para.split(/\s+/).length
-            }
-          });
-        }
-      });
-    }
-
-    return chunks;
-  }
-
-  async storeContract(filename, filepath, content, metadata) {
-    return new Promise((resolve, reject) => {
-      const stmt = this.db.prepare(`
-        INSERT INTO contracts (filename, filepath, content, metadata)
-        VALUES (?, ?, ?, ?)
-      `);
-      
-      stmt.run([filename, filepath, content, JSON.stringify(metadata)], function(err) {
-        if (err) reject(err);
-        else resolve(this.lastID);
-      });
-    });
-  }
-
-  async storeChunks(contractId, chunks) {
-    if (!this.openai) {
-      console.warn('OpenAI not configured - storing chunks without embeddings');
-      // Store without embeddings for now
-      for (const chunk of chunks) {
-        await this.storeChunk(contractId, chunk, null);
-      }
-      return;
-    }
-
-    // Generate embeddings in batches
-    const batchSize = 10;
-    for (let i = 0; i < chunks.length; i += batchSize) {
-      const batch = chunks.slice(i, i + batchSize);
-      
-      try {
-        const embeddings = await this.generateEmbeddings(batch.map(c => c.text));
-        
-        for (let j = 0; j < batch.length; j++) {
-          await this.storeChunk(contractId, batch[j], embeddings[j]);
-        }
-      } catch (error) {
-        console.error('Embedding generation error:', error);
-        // Store without embeddings as fallback
-        for (const chunk of batch) {
-          await this.storeChunk(contractId, chunk, null);
-        }
-      }
-    }
-  }
-
-  async generateEmbeddings(texts) {
-    const response = await this.openai.embeddings.create({
-      model: "text-embedding-3-small",
-      input: texts,
-    });
     
-    return response.data.map(item => item.embedding);
+    return 'general';
   }
 
-  async storeChunk(contractId, chunk, embedding) {
-    return new Promise((resolve, reject) => {
-      const stmt = this.db.prepare(`
-        INSERT INTO chunks (contract_id, chunk_text, chunk_type, embedding, metadata)
-        VALUES (?, ?, ?, ?, ?)
-      `);
-      
-      const embeddingBlob = embedding ? Buffer.from(new Float32Array(embedding).buffer) : null;
-      
-      stmt.run([
-        contractId,
-        chunk.text,
-        chunk.type,
-        embeddingBlob,
-        JSON.stringify(chunk.metadata)
-      ], function(err) {
-        if (err) reject(err);
-        else resolve(this.lastID);
-      });
-    });
-  }
-
-  async queryContracts(queryText, limit = 5) {
-    await this.initPromise;
-    
-    if (!this.openai) {
-      // Fallback to text search
-      return this.textSearch(queryText, limit);
+  // Format context from search results for LLM
+  formatContext(searchResults) {
+    if (!searchResults || searchResults.length === 0) {
+      return "No relevant document sections found.";
     }
 
+    return searchResults.map((result, index) => {
+      const similarity = result.avgSimilarity || result.similarity || 0;
+      const documentName = result.document ? result.document.originalName : 'Unknown Document';
+      
+      let formattedChunks = '';
+      if (result.chunks) {
+        formattedChunks = result.chunks.map((chunk, chunkIndex) => {
+          const chunkSimilarity = chunk.similarity ? ` (${Math.round(chunk.similarity * 100)}% match)` : '';
+          return `[Chunk ${chunkIndex + 1}${chunkSimilarity}]: ${chunk.text}`;
+        }).join('\n\n');
+      } else if (result.text) {
+        const resultSimilarity = similarity ? ` (${Math.round(similarity * 100)}% match)` : '';
+        formattedChunks = `[Content${resultSimilarity}]: ${result.text}`;
+      }
+
+      return `--- Document: ${documentName} ---\n${formattedChunks}`;
+    }).join('\n\n');
+  }
+
+  // Main RAG query method
+  async queryDocuments(query, conversationId = null, options = {}) {
     try {
-      // Generate query embedding
-      const queryEmbedding = await this.generateEmbeddings([queryText]);
-      
-      // Semantic search using embeddings
-      return this.semanticSearch(queryEmbedding[0], limit);
-      
-    } catch (error) {
-      console.error('Query error:', error);
-      // Fallback to text search
-      return this.textSearch(queryText, limit);
-    }
-  }
-
-  async textSearch(queryText, limit) {
-    return new Promise((resolve, reject) => {
-      const sql = `
-        SELECT c.filename, ch.chunk_text, ch.chunk_type, ch.metadata,
-               c.metadata as contract_metadata
-        FROM chunks ch
-        JOIN contracts c ON ch.contract_id = c.id
-        WHERE ch.chunk_text LIKE ?
-        ORDER BY c.created_at DESC
-        LIMIT ?
-      `;
-      
-      this.db.all(sql, [`%${queryText}%`, limit], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows.map(row => ({
-          filename: row.filename,
-          content: row.chunk_text,
-          type: row.chunk_type,
-          confidence: 0.5, // Placeholder
-          metadata: JSON.parse(row.metadata || '{}'),
-          contractMetadata: JSON.parse(row.contract_metadata || '{}')
-        })));
-      });
-    });
-  }
-
-  async semanticSearch(queryEmbedding, limit) {
-    // For SQLite, we'll implement a simple cosine similarity
-    // In production, consider using vector databases like Pinecone or Weaviate
-    
-    return new Promise((resolve, reject) => {
-      const sql = `
-        SELECT c.filename, ch.chunk_text, ch.chunk_type, ch.embedding,
-               ch.metadata, c.metadata as contract_metadata
-        FROM chunks ch
-        JOIN contracts c ON ch.contract_id = c.id
-        WHERE ch.embedding IS NOT NULL
-        ORDER BY c.created_at DESC
-      `;
-      
-      this.db.all(sql, [], (err, rows) => {
-        if (err) {
-          reject(err);
-          return;
+      if (!this.openai) {
+        const apiKey = this.settingsStore.get('openai_api_key');
+        if (!apiKey) {
+          throw new Error('OpenAI API key not configured. Please add your API key in settings.');
         }
+        await this.setupOpenAI(apiKey);
+      }
 
-        // Calculate similarities
-        const results = rows.map(row => {
-          const embedding = new Float32Array(row.embedding);
-          const similarity = this.cosineSimilarity(queryEmbedding, Array.from(embedding));
-          
-          return {
-            filename: row.filename,
-            content: row.chunk_text,
-            type: row.chunk_type,
-            confidence: similarity,
-            metadata: JSON.parse(row.metadata || '{}'),
-            contractMetadata: JSON.parse(row.contract_metadata || '{}')
-          };
-        });
+      const {
+        maxResults = 5,
+        useConversationContext = true,
+        searchType = 'hybrid'
+      } = options;
 
-        // Sort by similarity and limit
-        results.sort((a, b) => b.confidence - a.confidence);
-        resolve(results.slice(0, limit));
+      console.log(`🤖 RAG Query: "${query}"`);
+
+      // Step 1: Retrieve relevant context using existing search
+      const searchResults = await this.documentService.searchDocuments(query, searchType);
+      
+      if (searchResults.length === 0) {
+        return {
+          response: "I don't find any relevant information in your uploaded documents for this query. Please make sure you have uploaded documents that contain information related to your question.",
+          sources: [],
+          conversationId: conversationId || this.generateConversationId()
+        };
+      }
+
+      // Step 2: Format context for LLM
+      const context = this.formatContext(searchResults.slice(0, maxResults));
+      
+      // Step 3: Detect query type for specialized prompts
+      const queryType = this.detectQueryType(query);
+      
+      // Step 4: Generate appropriate prompt
+      const prompt = this.generatePrompt(query, context, queryType);
+
+      // Step 5: Get conversation history if requested
+      let messages = [{ role: 'user', content: prompt }];
+      if (useConversationContext && conversationId) {
+        const history = this.getConversationHistory(conversationId);
+        if (history.length > 0) {
+          // Add recent context (last 4 exchanges to avoid token limits)
+          const recentHistory = history.slice(-8); // 4 user + 4 assistant messages
+          messages = [...recentHistory, { role: 'user', content: prompt }];
+        }
+      }
+
+      // Step 6: Generate LLM response
+      const completion = await this.openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: messages,
+        temperature: 0.3, // Lower temperature for more factual responses
+        max_tokens: 1000,
+        stream: false
       });
-    });
-  }
 
-  cosineSimilarity(vecA, vecB) {
-    if (vecA.length !== vecB.length) return 0;
-    
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-    
-    for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
+      const response = completion.choices[0].message.content;
+
+      // Step 7: Save conversation
+      const finalConversationId = conversationId || this.generateConversationId();
+      this.saveConversationTurn(finalConversationId, query, response, searchResults);
+
+      console.log(`✅ RAG Response generated (${response.length} chars)`);
+
+      return {
+        response: response,
+        sources: searchResults.map(result => ({
+          document: result.document.originalName,
+          matches: result.matches,
+          similarity: result.avgSimilarity || result.similarity,
+          chunks: result.chunks ? result.chunks.length : 1
+        })),
+        conversationId: finalConversationId,
+        queryType: queryType
+      };
+
+    } catch (error) {
+      console.error('❌ RAG Query failed:', error);
+      
+      // Fallback to search-only response
+      try {
+        const searchResults = await this.documentService.searchDocuments(query, 'keyword');
+        return {
+          response: `I encountered an error generating a detailed response, but I found ${searchResults.length} relevant sections in your documents. ${error.message.includes('API key') ? 'Please check your OpenAI API key configuration.' : 'Please try rephrasing your question.'}`,
+          sources: searchResults.map(result => ({
+            document: result.document.originalName,
+            matches: result.matches,
+            chunks: result.chunks ? result.chunks.length : 1
+          })),
+          conversationId: conversationId || this.generateConversationId(),
+          error: error.message
+        };
+      } catch (fallbackError) {
+        throw new Error(`RAG query failed: ${error.message}`);
+      }
     }
-    
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
   }
 
-  async close() {
-    if (this.db) {
-      this.db.close();
+  // Conversation management
+  generateConversationId() {
+    return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  saveConversationTurn(conversationId, query, response, sources) {
+    try {
+      const conversations = this.conversationStore.get('conversations', {});
+      
+      if (!conversations[conversationId]) {
+        conversations[conversationId] = {
+          id: conversationId,
+          created: new Date().toISOString(),
+          messages: []
+        };
+      }
+
+      conversations[conversationId].messages.push({
+        timestamp: new Date().toISOString(),
+        query: query,
+        response: response,
+        sources: sources ? sources.length : 0
+      });
+
+      conversations[conversationId].updated = new Date().toISOString();
+      
+      // Keep only last 50 conversations to manage storage
+      const conversationIds = Object.keys(conversations);
+      if (conversationIds.length > 50) {
+        const sortedConversations = conversationIds
+          .map(id => ({ id, updated: conversations[id].updated }))
+          .sort((a, b) => new Date(b.updated) - new Date(a.updated));
+        
+        // Remove oldest conversations
+        sortedConversations.slice(50).forEach(conv => {
+          delete conversations[conv.id];
+        });
+      }
+
+      this.conversationStore.set('conversations', conversations);
+    } catch (error) {
+      console.error('❌ Error saving conversation:', error);
+    }
+  }
+
+  getConversationHistory(conversationId) {
+    try {
+      const conversations = this.conversationStore.get('conversations', {});
+      const conversation = conversations[conversationId];
+      
+      if (!conversation) return [];
+
+      // Convert to OpenAI message format
+      const messages = [];
+      conversation.messages.forEach(turn => {
+        messages.push({ role: 'user', content: turn.query });
+        messages.push({ role: 'assistant', content: turn.response });
+      });
+
+      return messages;
+    } catch (error) {
+      console.error('❌ Error getting conversation history:', error);
+      return [];
+    }
+  }
+
+  getAllConversations() {
+    try {
+      const conversations = this.conversationStore.get('conversations', {});
+      return Object.values(conversations)
+        .sort((a, b) => new Date(b.updated) - new Date(a.updated))
+        .map(conv => ({
+          id: conv.id,
+          created: conv.created,
+          updated: conv.updated,
+          messageCount: conv.messages.length,
+          lastQuery: conv.messages.length > 0 ? conv.messages[conv.messages.length - 1].query.substring(0, 100) : ''
+        }));
+    } catch (error) {
+      console.error('❌ Error getting conversations:', error);
+      return [];
+    }
+  }
+
+  deleteConversation(conversationId) {
+    try {
+      const conversations = this.conversationStore.get('conversations', {});
+      if (conversations[conversationId]) {
+        delete conversations[conversationId];
+        this.conversationStore.set('conversations', conversations);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('❌ Error deleting conversation:', error);
+      return false;
+    }
+  }
+
+  clearAllConversations() {
+    try {
+      this.conversationStore.set('conversations', {});
+      return true;
+    } catch (error) {
+      console.error('❌ Error clearing conversations:', error);
+      return false;
     }
   }
 }
