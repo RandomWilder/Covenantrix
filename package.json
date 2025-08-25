@@ -1,6 +1,6 @@
 {
   "name": "contract-rag-manager",
-  "version": "1.2.1",
+  "version": "1.2.3",
   "description": "AI-Powered Contract Analysis with Conversational RAG Interface",
   "author": "RandomWilder",
   "main": "src/main/main.js",
@@ -22,6 +22,14 @@
       "src/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "**/*.node",
+      "**/node_modules/sharp/**/*",
+      "**/node_modules/@img/**/*",
+      "**/node_modules/tesseract.js/**/*",
+      "**/node_modules/pdf-poppler/**/*",
+      "**/node_modules/@google-cloud/**/*"
+    ],
     "win": {
       "target": [
         {
@@ -41,11 +49,12 @@
         {
           "target": "dmg",
           "arch": [
-            "universal"
+            "x64",
+            "arm64"
           ]
         }
       ],
-      "artifactName": "${productName}-${version}-mac.${ext}",
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
       "hardenedRuntime": false,
       "gatekeeperAssess": false
     },

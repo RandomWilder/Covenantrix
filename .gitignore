@@ -93,3 +93,18 @@ app/
 *.swo
 *~
 .DS_Store
+
+# OCR training data files (large binary files)
+*.traineddata
+
+# User data and settings
+user-data/
+app-data/
+*.db
+*.sqlite
+*.sqlite3
+
+# API keys and secrets (additional safety)
+config.json
+settings.json
+.secrets
