@@ -8,6 +8,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // File operations
   selectFile: () => ipcRenderer.invoke('select-file'),
+  selectFiles: () => ipcRenderer.invoke('select-files'),
+  
+  // Document operations
+  processDocuments: (filePaths) => ipcRenderer.invoke('process-documents', filePaths),
+  getDocuments: () => ipcRenderer.invoke('get-documents'),
+  searchDocuments: (query) => ipcRenderer.invoke('search-documents', query),
+  deleteDocument: (documentId) => ipcRenderer.invoke('delete-document', documentId),
+  
+  // Processing status listener
+  onProcessingStatus: (callback) => ipcRenderer.on('processing-status', callback),
   
   // Update operations
   restartApp: () => ipcRenderer.invoke('restart-app'),

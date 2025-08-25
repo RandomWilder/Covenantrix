@@ -127,8 +127,66 @@
             color: #742a2a;
         }
 
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
         .hidden {
             display: none;
+        }
+
+        .drag-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            width: 100%;
+            min-height: 150px;
+            text-align: center;
+            color: #666;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .drag-area:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .drag-area.dragover {
+            border-color: #667eea;
+            background: #f0f4ff;
+            color: #667eea;
+        }
+
+        .drag-text {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            background: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .error-text {
+            color: #d32f2f;
+            font-size: 0.9em;
+            margin-top: 5px;
         }
     </style>
 </head>
@@ -136,13 +194,22 @@
     <div class="container">
         <div class="header">
             <h1>📄 Covenantrix</h1>
-            <span class="version">v1.0.0</span>
+            <span class="version">v1.0.6</span>
         </div>
 
         <div class="main-content">
             <div class="card">
                 <h2>📁 Upload Contracts</h2>
-                <button class="btn" onclick="uploadFiles()">Upload Contracts</button>
+                
+                <div class="drag-area" id="drag-area" onclick="selectFiles()">
+                    <div class="drag-text">
+                        <span style="font-size: 2em;">📄</span>
+                        <span>Drag & Drop PDF files here</span>
+                        <span style="font-size: 0.9em; color: #999;">or click to browse</span>
+                    </div>
+                </div>
+                
+                <button class="btn" onclick="selectFiles()">Browse Files</button>
                 
                 <div id="contracts-list" class="contracts-list hidden">
                     <h3>Uploaded Contracts</h3>
@@ -173,51 +240,184 @@
         console.log('✅ Contract RAG Manager Started!');
         
         let contracts = [];
-        let contractCounter = 0;
+        let processingFiles = {};
 
-        function uploadFiles() {
-            console.log('📁 Upload clicked');
-            
-            // Simulate file upload
-            contractCounter++;
-            const newContract = {
-                id: contractCounter,
-                name: `Sample_Contract_${contractCounter}.pdf`,
-                uploadedAt: new Date().toLocaleString(),
-                status: 'Processing...'
-            };
-            
-            contracts.push(newContract);
-            updateContractsList();
-            
-            // Simulate processing delay
-            setTimeout(() => {
-                newContract.status = 'Ready';
-                updateContractsList();
-            }, 2000);
+        // Initialize the app
+        async function initializeApp() {
+            await loadExistingDocuments();
+            setupDragAndDrop();
+            setupProcessingListener();
         }
 
+        // Load existing documents from storage
+        async function loadExistingDocuments() {
+            try {
+                const documents = await window.electronAPI.getDocuments();
+                contracts = documents;
+                updateContractsList();
+            } catch (error) {
+                console.error('Error loading documents:', error);
+            }
+        }
+
+        // Set up drag and drop functionality
+        function setupDragAndDrop() {
+            const dragArea = document.getElementById('drag-area');
+            
+            dragArea.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                dragArea.classList.add('dragover');
+            });
+            
+            dragArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+            });
+            
+            dragArea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                if (e.target === dragArea) {
+                    dragArea.classList.remove('dragover');
+                }
+            });
+            
+            dragArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dragArea.classList.remove('dragover');
+                
+                const files = Array.from(e.dataTransfer.files);
+                const pdfFiles = files.filter(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
+                
+                if (pdfFiles.length > 0) {
+                    const filePaths = pdfFiles.map(file => file.path);
+                    processSelectedFiles(filePaths);
+                } else {
+                    alert('Please drop only PDF files.');
+                }
+            });
+        }
+
+        // Set up processing status listener
+        function setupProcessingListener() {
+            window.electronAPI.onProcessingStatus((event, data) => {
+                console.log('Processing status:', data);
+                
+                if (data.status === 'processing') {
+                    processingFiles[data.fileName] = { status: 'processing', fileName: data.fileName };
+                    updateProcessingStatus(data.fileName, 'Processing...', false);
+                } else if (data.status === 'completed' && data.result.success) {
+                    delete processingFiles[data.fileName];
+                    contracts.push(data.result.document);
+                    updateContractsList();
+                } else if (data.status === 'error') {
+                    delete processingFiles[data.fileName];
+                    updateProcessingStatus(data.fileName, `Error: ${data.error}`, true);
+                }
+            });
+        }
+
+        // File selection
+        async function selectFiles() {
+            try {
+                const result = await window.electronAPI.selectFiles();
+                if (result.success && result.filePaths.length > 0) {
+                    await processSelectedFiles(result.filePaths);
+                }
+            } catch (error) {
+                console.error('Error selecting files:', error);
+                alert('Error selecting files: ' + error.message);
+            }
+        }
+
+        // Process selected files
+        async function processSelectedFiles(filePaths) {
+            console.log('📄 Processing files:', filePaths);
+            
+            // Add temporary entries for files being processed
+            filePaths.forEach(filePath => {
+                const fileName = filePath.split(/[/\\]/).pop();
+                processingFiles[fileName] = { status: 'processing', fileName };
+                addProcessingItem(fileName);
+            });
+            
+            try {
+                await window.electronAPI.processDocuments(filePaths);
+                console.log('✅ All files processed');
+            } catch (error) {
+                console.error('Error processing files:', error);
+                alert('Error processing files: ' + error.message);
+            }
+        }
+
+        // Add processing item to UI
+        function addProcessingItem(fileName) {
+            const listElement = document.getElementById('contracts-list');
+            const contractsElement = document.getElementById('contracts');
+            
+            listElement.classList.remove('hidden');
+            
+            const processingItem = document.createElement('div');
+            processingItem.className = 'contract-item';
+            processingItem.id = `processing-${fileName}`;
+            processingItem.innerHTML = `
+                <strong>${fileName}</strong>
+                <span class="status processing">Processing...</span>
+                <div style="clear: both; font-size: 0.8em; color: #666; margin-top: 5px;">
+                    ${new Date().toLocaleString()}
+                </div>
+            `;
+            
+            contractsElement.appendChild(processingItem);
+        }
+
+        // Update processing status
+        function updateProcessingStatus(fileName, status, isError) {
+            const processingItem = document.getElementById(`processing-${fileName}`);
+            if (processingItem) {
+                const statusElement = processingItem.querySelector('.status');
+                statusElement.textContent = status;
+                statusElement.className = `status ${isError ? 'error' : 'processing'}`;
+                
+                if (isError) {
+                    setTimeout(() => {
+                        processingItem.remove();
+                    }, 5000);
+                }
+            }
+        }
+
+        // Update contracts list
         function updateContractsList() {
             const listElement = document.getElementById('contracts-list');
             const contractsElement = document.getElementById('contracts');
             
             if (contracts.length > 0) {
                 listElement.classList.remove('hidden');
-                contractsElement.innerHTML = contracts.map(contract => `
-                    <div class="contract-item">
-                        <strong>${contract.name}</strong>
-                        <span class="status ${contract.status === 'Ready' ? 'ready' : 'processing'}">
-                            ${contract.status}
-                        </span>
+                
+                // Remove old contract items (keep processing items)
+                const existingContracts = contractsElement.querySelectorAll('.contract-item:not([id*="processing-"])');
+                existingContracts.forEach(item => item.remove());
+                
+                // Add contract items
+                contracts.forEach(contract => {
+                    const contractItem = document.createElement('div');
+                    contractItem.className = 'contract-item';
+                    contractItem.innerHTML = `
+                        <strong>${contract.originalName}</strong>
+                        <span class="status ready">Ready</span>
                         <div style="clear: both; font-size: 0.8em; color: #666; margin-top: 5px;">
-                            ${contract.uploadedAt}
+                            ${new Date(contract.uploadedAt).toLocaleString()} • ${contract.chunksCount} chunks
                         </div>
-                    </div>
-                `).join('');
+                        <div style="clear: both; font-size: 0.8em; color: #999; margin-top: 2px;">
+                            ${Math.round(contract.textLength / 1000)}k characters
+                        </div>
+                    `;
+                    contractsElement.appendChild(contractItem);
+                });
             }
         }
 
-        function searchContracts() {
+        // Search contracts
+        async function searchContracts() {
             const query = document.getElementById('query-input').value.trim();
             if (!query) return;
             
@@ -229,17 +429,41 @@
             resultsContent.innerHTML = '<div class="result-item">🔍 Searching...</div>';
             resultsElement.classList.remove('hidden');
             
-            // Simulate search delay
-            setTimeout(() => {
+            try {
+                const results = await window.electronAPI.searchDocuments(query);
+                
+                if (results.length > 0) {
+                    resultsContent.innerHTML = results.map(result => `
+                        <div class="result-item">
+                            <div><strong>Found ${result.matches} match${result.matches > 1 ? 'es' : ''} in:</strong> ${result.document.originalName}</div>
+                            ${result.chunks.map(chunk => `
+                                <div style="margin: 10px 0; padding: 10px; background: #f0f4ff; border-left: 3px solid #667eea; font-size: 0.9em;">
+                                    ${chunk.text.substring(0, 200)}${chunk.text.length > 200 ? '...' : ''}
+                                </div>
+                            `).join('')}
+                            <div style="margin-top: 10px; font-size: 0.8em; color: #666;">
+                                📄 ${result.document.originalName} • ${result.matches} matches found
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    resultsContent.innerHTML = `
+                        <div class="result-item">
+                            <div>No results found for: "${query}"</div>
+                            <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                                Try different keywords or upload more documents.
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error searching:', error);
                 resultsContent.innerHTML = `
                     <div class="result-item">
-                        <div><strong>Found relevant information for:</strong> "${query}"</div>
-                        <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                            📄 Sample_Contract_${contractCounter || 1}.pdf • Confidence: 95%
-                        </div>
+                        <div style="color: #d32f2f;">Search failed: ${error.message}</div>
                     </div>
                 `;
-            }, 1000);
+            }
         }
 
         function handleEnter(event) {
@@ -247,6 +471,9 @@
                 searchContracts();
             }
         }
+
+        // Initialize when the page loads
+        document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
 </body>
 </html>

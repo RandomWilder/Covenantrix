@@ -1,6 +1,6 @@
 {
   "name": "contract-rag-manager",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Smart Contract Management System with RAG Framework",
   "author": "RandomWilder",
   "main": "src/main/main.js",
@@ -67,7 +67,10 @@
     ]
   },
   "dependencies": {
-    "electron-updater": "^6.6.2"
+    "electron-updater": "^6.6.2",
+    "pdf-parse": "^1.1.1",
+    "electron-store": "^8.1.0",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "electron": "^25.3.0",

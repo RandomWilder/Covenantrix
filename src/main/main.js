@@ -1,8 +1,10 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
+const DocumentService = require('./services/documentService');
 
 let mainWindow;
+let documentService;
 
 // Configure auto-updater (only in production)
 if (!app.isPackaged) {
@@ -71,8 +73,9 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
     },
     show: false
   });
@@ -96,7 +99,67 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  // Initialize document service
+  documentService = new DocumentService();
+  setupIPCHandlers();
+  createWindow();
+});
+
+// IPC handlers for document operations
+function setupIPCHandlers() {
+  // Handle file upload dialog
+  ipcMain.handle('select-files', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'PDF Documents', extensions: ['pdf'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+    
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+    
+    return { success: true, filePaths: result.filePaths };
+  });
+
+  // Process uploaded documents
+  ipcMain.handle('process-documents', async (event, filePaths) => {
+    const results = [];
+    
+    for (const filePath of filePaths) {
+      const fileName = path.basename(filePath);
+      try {
+        event.sender.send('processing-status', { fileName, status: 'processing' });
+        const result = await documentService.processDocument(filePath, fileName);
+        results.push({ fileName, ...result });
+        event.sender.send('processing-status', { fileName, status: result.success ? 'completed' : 'error', result });
+      } catch (error) {
+        results.push({ fileName, success: false, error: error.message });
+        event.sender.send('processing-status', { fileName, status: 'error', error: error.message });
+      }
+    }
+    
+    return results;
+  });
+
+  // Get all documents
+  ipcMain.handle('get-documents', async () => {
+    return documentService.getAllDocuments();
+  });
+
+  // Search documents
+  ipcMain.handle('search-documents', async (event, query) => {
+    return documentService.searchDocuments(query);
+  });
+
+  // Delete document
+  ipcMain.handle('delete-document', async (event, documentId) => {
+    return documentService.deleteDocument(documentId);
+  });
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
