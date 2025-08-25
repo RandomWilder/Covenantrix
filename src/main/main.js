@@ -108,12 +108,14 @@ app.whenReady().then(() => {
 
 // IPC handlers for document operations
 function setupIPCHandlers() {
-  // Handle file upload dialog
+  // Handle file upload dialog with Phase 2 support
   ipcMain.handle('select-files', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openFile', 'multiSelections'],
       filters: [
         { name: 'PDF Documents', extensions: ['pdf'] },
+        { name: 'Image Files', extensions: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'] },
+        { name: 'All Supported', extensions: ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'] },
         { name: 'All Files', extensions: ['*'] }
       ]
     });
@@ -150,14 +152,52 @@ function setupIPCHandlers() {
     return documentService.getAllDocuments();
   });
 
-  // Search documents
-  ipcMain.handle('search-documents', async (event, query) => {
-    return documentService.searchDocuments(query);
+  // Enhanced search with different modes
+  ipcMain.handle('search-documents', async (event, query, searchType = 'hybrid') => {
+    return documentService.searchDocuments(query, searchType);
   });
 
-  // Delete document
+  // Delete document (now removes from vector database too)
   ipcMain.handle('delete-document', async (event, documentId) => {
     return documentService.deleteDocument(documentId);
+  });
+
+  // API Key Management
+  ipcMain.handle('set-openai-key', async (event, apiKey) => {
+    return await documentService.setOpenAIApiKey(apiKey);
+  });
+
+  ipcMain.handle('get-stored-api-key', async () => {
+    return documentService.getStoredApiKey();
+  });
+
+  ipcMain.handle('clear-api-key', async () => {
+    documentService.clearApiKey();
+    return true;
+  });
+
+  // Vector database stats
+  ipcMain.handle('get-vector-stats', async () => {
+    return await documentService.getVectorStats();
+  });
+
+  // Get supported file types
+  ipcMain.handle('get-supported-types', async () => {
+    return {
+      pdf: ['pdf'],
+      images: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'],
+      all: ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp']
+    };
+  });
+
+  // Get OCR language support
+  ipcMain.handle('get-language-support', async () => {
+    return documentService.ocrService.getLanguageSupport();
+  });
+
+  // Add language support
+  ipcMain.handle('add-language-support', async (event, languageCode) => {
+    return await documentService.ocrService.addLanguageSupport(languageCode);
   });
 }
 

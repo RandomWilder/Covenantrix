@@ -188,42 +188,209 @@
             font-size: 0.9em;
             margin-top: 5px;
         }
+
+        .search-modes {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .search-mode {
+            padding: 8px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .search-mode:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .search-mode.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .settings-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .api-key-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1em;
+            margin-bottom: 15px;
+            font-family: monospace;
+        }
+
+        .api-key-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-small {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: transform 0.2s ease;
+        }
+
+        .btn-small:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .similarity-score {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .search-type-badge {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            margin-left: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>📄 Covenantrix</h1>
-            <span class="version">v1.0.6</span>
+            <span class="version">v1.1.0 (Phase 2)</span>
         </div>
 
         <div class="main-content">
+            <!-- Settings Card -->
+            <div class="settings-card">
+                <h2>⚙️ Settings</h2>
+                
+                <h3 style="margin-bottom: 10px;">🔑 OpenAI API Key</h3>
+                <input 
+                    type="password" 
+                    id="api-key-input"
+                    class="api-key-input" 
+                    placeholder="Enter your OpenAI API key (required for semantic search)..."
+                >
+                <button class="btn-small" onclick="saveApiKey()">Save Key</button>
+                <button class="btn-small btn-danger" onclick="clearApiKey()">Clear Key</button>
+                <div id="api-key-status" style="margin-top: 10px; font-size: 0.9em;"></div>
+                
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="total-docs">0</div>
+                        <div class="stat-label">Documents</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="total-chunks">0</div>
+                        <div class="stat-label">Chunks</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="vector-status">❌</div>
+                        <div class="stat-label">Semantic Search</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="language-status">🌐</div>
+                        <div class="stat-label">OCR Languages</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Card -->
             <div class="card">
-                <h2>📁 Upload Contracts</h2>
+                <h2>📁 Upload Documents</h2>
                 
                 <div class="drag-area" id="drag-area" onclick="selectFiles()">
                     <div class="drag-text">
                         <span style="font-size: 2em;">📄</span>
-                        <span>Drag & Drop PDF files here</span>
-                        <span style="font-size: 0.9em; color: #999;">or click to browse</span>
+                        <span>Drag & Drop PDF files or Images here</span>
+                        <span style="font-size: 0.9em; color: #999;">Supports: PDF, PNG, JPG, TIFF, etc.</span>
                     </div>
                 </div>
                 
                 <button class="btn" onclick="selectFiles()">Browse Files</button>
                 
                 <div id="contracts-list" class="contracts-list hidden">
-                    <h3>Uploaded Contracts</h3>
+                    <h3>Uploaded Documents</h3>
                     <div id="contracts"></div>
                 </div>
             </div>
 
+            <!-- Search Card -->
             <div class="card">
-                <h2>🔍 Query Contracts</h2>
+                <h2>🔍 Query Documents</h2>
+                
+                <div class="search-modes">
+                    <div class="search-mode active" data-mode="hybrid" onclick="setSearchMode('hybrid')">
+                        🧠 Hybrid Search
+                    </div>
+                    <div class="search-mode" data-mode="semantic" onclick="setSearchMode('semantic')">
+                        🎯 Semantic
+                    </div>
+                    <div class="search-mode" data-mode="keyword" onclick="setSearchMode('keyword')">
+                        📝 Keyword
+                    </div>
+                </div>
+                
                 <input 
                     type="text" 
                     id="query-input"
                     class="query-input" 
-                    placeholder="Ask questions about your contracts..."
+                    placeholder="Ask questions about your documents..."
                     onkeypress="handleEnter(event)"
                 >
                 <button class="btn" onclick="searchContracts()">Search</button>
@@ -241,12 +408,15 @@
         
         let contracts = [];
         let processingFiles = {};
+        let currentSearchMode = 'hybrid';
 
         // Initialize the app
         async function initializeApp() {
             await loadExistingDocuments();
             setupDragAndDrop();
             setupProcessingListener();
+            await loadApiKeyStatus();
+            await updateStats();
         }
 
         // Load existing documents from storage
@@ -285,13 +455,13 @@
                 dragArea.classList.remove('dragover');
                 
                 const files = Array.from(e.dataTransfer.files);
-                const pdfFiles = files.filter(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
+                const supportedFiles = files.filter(file => isSupportedFile(file));
                 
-                if (pdfFiles.length > 0) {
-                    const filePaths = pdfFiles.map(file => file.path);
+                if (supportedFiles.length > 0) {
+                    const filePaths = supportedFiles.map(file => file.path);
                     processSelectedFiles(filePaths);
                 } else {
-                    alert('Please drop only PDF files.');
+                    alert('Please drop only supported files (PDF, PNG, JPG, TIFF, etc.).');
                 }
             });
         }
@@ -308,6 +478,7 @@
                     delete processingFiles[data.fileName];
                     contracts.push(data.result.document);
                     updateContractsList();
+                    updateStats(); // Update stats when document is added
                 } else if (data.status === 'error') {
                     delete processingFiles[data.fileName];
                     updateProcessingStatus(data.fileName, `Error: ${data.error}`, true);
@@ -406,9 +577,14 @@
                         <span class="status ready">Ready</span>
                         <div style="clear: both; font-size: 0.8em; color: #666; margin-top: 5px;">
                             ${new Date(contract.uploadedAt).toLocaleString()} • ${contract.chunksCount} chunks
+                            ${contract.ocrConfidence ? `• OCR: ${Math.round(contract.ocrConfidence)}%` : ''}
+                            ${contract.detectedLanguage ? `• 🌐 ${contract.detectedLanguage}` : ''}
                         </div>
                         <div style="clear: both; font-size: 0.8em; color: #999; margin-top: 2px;">
                             ${Math.round(contract.textLength / 1000)}k characters
+                            ${contract.vectorized ? ' • 🧠 Vectorized' : ' • ⚠️ Not vectorized'}
+                            ${contract.hasHebrew ? ' • 🔤 Hebrew' : ''}
+                            ${contract.hasArabic ? ' • 🔤 Arabic' : ''}
                         </div>
                     `;
                     contractsElement.appendChild(contractItem);
@@ -416,12 +592,12 @@
             }
         }
 
-        // Search contracts
+        // Enhanced search with different modes
         async function searchContracts() {
             const query = document.getElementById('query-input').value.trim();
             if (!query) return;
             
-            console.log('🔍 Searching for:', query);
+            console.log(`🔍 Searching for: "${query}" using ${currentSearchMode} mode`);
             
             const resultsElement = document.getElementById('results');
             const resultsContent = document.getElementById('results-content');
@@ -430,19 +606,28 @@
             resultsElement.classList.remove('hidden');
             
             try {
-                const results = await window.electronAPI.searchDocuments(query);
+                const results = await window.electronAPI.searchDocuments(query, currentSearchMode);
                 
                 if (results.length > 0) {
                     resultsContent.innerHTML = results.map(result => `
                         <div class="result-item">
-                            <div><strong>Found ${result.matches} match${result.matches > 1 ? 'es' : ''} in:</strong> ${result.document.originalName}</div>
+                            <div>
+                                <strong>Found ${result.matches} match${result.matches > 1 ? 'es' : ''} in:</strong> 
+                                ${result.document.originalName}
+                                <span class="search-type-badge">${result.searchType || currentSearchMode}</span>
+                                ${result.avgSimilarity ? `<span class="similarity-score">${Math.round(result.avgSimilarity * 100)}% match</span>` : ''}
+                            </div>
                             ${result.chunks.map(chunk => `
                                 <div style="margin: 10px 0; padding: 10px; background: #f0f4ff; border-left: 3px solid #667eea; font-size: 0.9em;">
-                                    ${chunk.text.substring(0, 200)}${chunk.text.length > 200 ? '...' : ''}
+                                    ${chunk.text.substring(0, 250)}${chunk.text.length > 250 ? '...' : ''}
+                                    ${chunk.similarity ? `<div style="font-size: 0.8em; color: #666; margin-top: 5px;">Similarity: ${Math.round(chunk.similarity * 100)}%</div>` : ''}
                                 </div>
                             `).join('')}
                             <div style="margin-top: 10px; font-size: 0.8em; color: #666;">
-                                📄 ${result.document.originalName} • ${result.matches} matches found
+                                📄 ${result.document.originalName} 
+                                • ${result.matches} matches 
+                                ${result.document.ocrConfidence ? `• OCR: ${Math.round(result.document.ocrConfidence)}%` : ''}
+                                ${result.document.vectorized ? '• 🧠 Vectorized' : ''}
                             </div>
                         </div>
                     `).join('');
@@ -451,7 +636,7 @@
                         <div class="result-item">
                             <div>No results found for: "${query}"</div>
                             <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                                Try different keywords or upload more documents.
+                                ${currentSearchMode === 'semantic' ? 'Make sure you have an OpenAI API key configured and documents are vectorized.' : 'Try different keywords or upload more documents.'}
                             </div>
                         </div>
                     `;
@@ -461,9 +646,128 @@
                 resultsContent.innerHTML = `
                     <div class="result-item">
                         <div style="color: #d32f2f;">Search failed: ${error.message}</div>
+                        <div style="margin-top: 5px; font-size: 0.9em;">
+                            ${currentSearchMode === 'semantic' ? 'Semantic search requires an OpenAI API key. Try keyword search instead.' : ''}
+                        </div>
                     </div>
                 `;
             }
+        }
+
+        // Search mode selection
+        function setSearchMode(mode) {
+            currentSearchMode = mode;
+            
+            // Update UI
+            document.querySelectorAll('.search-mode').forEach(element => {
+                element.classList.remove('active');
+            });
+            document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+            
+            console.log(`Search mode changed to: ${mode}`);
+        }
+
+        // API Key Management
+        async function saveApiKey() {
+            const apiKey = document.getElementById('api-key-input').value.trim();
+            if (!apiKey) {
+                updateApiKeyStatus('❌ Please enter an API key', 'error');
+                return;
+            }
+            
+            updateApiKeyStatus('🔄 Validating API key...', 'info');
+            
+            try {
+                const success = await window.electronAPI.setOpenAIKey(apiKey);
+                if (success) {
+                    updateApiKeyStatus('✅ API key saved and validated!', 'success');
+                    document.getElementById('api-key-input').value = '';
+                    await updateStats();
+                } else {
+                    updateApiKeyStatus('❌ Invalid API key. Please check and try again.', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving API key:', error);
+                updateApiKeyStatus('❌ Error saving API key: ' + error.message, 'error');
+            }
+        }
+
+        async function clearApiKey() {
+            try {
+                await window.electronAPI.clearApiKey();
+                updateApiKeyStatus('🗑️ API key cleared', 'info');
+                await updateStats();
+            } catch (error) {
+                console.error('Error clearing API key:', error);
+                updateApiKeyStatus('❌ Error clearing API key', 'error');
+            }
+        }
+
+        async function loadApiKeyStatus() {
+            try {
+                const hasKey = await window.electronAPI.getStoredApiKey();
+                if (hasKey) {
+                    updateApiKeyStatus('✅ API key configured', 'success');
+                } else {
+                    updateApiKeyStatus('⚠️ No API key configured. Semantic search unavailable.', 'warning');
+                }
+            } catch (error) {
+                console.error('Error loading API key status:', error);
+            }
+        }
+
+        function updateApiKeyStatus(message, type) {
+            const statusElement = document.getElementById('api-key-status');
+            statusElement.textContent = message;
+            statusElement.style.color = {
+                'success': '#2e7d32',
+                'error': '#d32f2f',
+                'warning': '#f57c00',
+                'info': '#1976d2'
+            }[type] || '#666';
+        }
+
+        // Update statistics
+        async function updateStats() {
+            try {
+                const [documents, vectorStats, languageSupport] = await Promise.all([
+                    window.electronAPI.getDocuments(),
+                    window.electronAPI.getVectorStats(),
+                    window.electronAPI.getLanguageSupport()
+                ]);
+                
+                document.getElementById('total-docs').textContent = documents.length;
+                document.getElementById('total-chunks').textContent = vectorStats.total_chunks || 0;
+                document.getElementById('vector-status').textContent = vectorStats.has_openai_key ? '✅' : '❌';
+                
+                // Update language support status
+                const langStatus = document.getElementById('language-status');
+                if (languageSupport.hasHebrewSupport) {
+                    langStatus.textContent = languageSupport.hasMultiLanguageSupport ? '🌐✅' : '🔤✅';
+                    langStatus.title = `OCR supports: ${languageSupport.activeWorkers.join(', ')}`;
+                } else {
+                    langStatus.textContent = '🔤';
+                    langStatus.title = 'OCR supports: English only';
+                }
+            } catch (error) {
+                console.error('Error updating stats:', error);
+            }
+        }
+
+        // Check if file is supported
+        function isSupportedFile(file) {
+            const supportedTypes = [
+                'application/pdf',
+                'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 
+                'image/bmp', 'image/tiff', 'image/webp'
+            ];
+            
+            const supportedExtensions = [
+                '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'
+            ];
+            
+            return supportedTypes.includes(file.type) || 
+                   supportedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
         }
 
         function handleEnter(event) {

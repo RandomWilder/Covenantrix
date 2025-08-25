@@ -13,8 +13,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Document operations
   processDocuments: (filePaths) => ipcRenderer.invoke('process-documents', filePaths),
   getDocuments: () => ipcRenderer.invoke('get-documents'),
-  searchDocuments: (query) => ipcRenderer.invoke('search-documents', query),
+  searchDocuments: (query, searchType) => ipcRenderer.invoke('search-documents', query, searchType),
   deleteDocument: (documentId) => ipcRenderer.invoke('delete-document', documentId),
+  
+  // Phase 2: API Key Management
+  setOpenAIKey: (apiKey) => ipcRenderer.invoke('set-openai-key', apiKey),
+  getStoredApiKey: () => ipcRenderer.invoke('get-stored-api-key'),
+  clearApiKey: () => ipcRenderer.invoke('clear-api-key'),
+  
+  // Phase 2: Vector Database
+  getVectorStats: () => ipcRenderer.invoke('get-vector-stats'),
+  getSupportedTypes: () => ipcRenderer.invoke('get-supported-types'),
+  
+  // Phase 2: Language Support
+  getLanguageSupport: () => ipcRenderer.invoke('get-language-support'),
+  addLanguageSupport: (languageCode) => ipcRenderer.invoke('add-language-support', languageCode),
   
   // Processing status listener
   onProcessingStatus: (callback) => ipcRenderer.on('processing-status', callback),
