@@ -44,6 +44,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   switchPersona: (personaId) => ipcRenderer.invoke('switch-persona', personaId),
   clearCurrentPersonaConversations: () => ipcRenderer.invoke('clear-current-persona-conversations'),
 
+  // 💰 Token Budget Management
+  getUserTokenBudget: () => ipcRenderer.invoke('get-user-token-budget'),
+  setUserTokenBudget: (budget) => ipcRenderer.invoke('set-user-token-budget', budget),
+
   // 📁 Folder Management
   getFolders: () => ipcRenderer.invoke('get-folders'),
   createFolder: (name, options) => ipcRenderer.invoke('create-folder', name, options),

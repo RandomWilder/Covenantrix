@@ -1139,12 +1139,36 @@ class DocumentService {
       // Get all search results first
       const allResults = await this.searchDocuments(query, searchType);
       
-      // Filter by specific document ID
+      // Debug: Log result structure to understand the issue
+      if (allResults.length > 0) {
+        console.log(`🔍 Debug - First result structure:`, {
+          hasDocument: !!allResults[0].document,
+          hasDocumentId: !!allResults[0].document_id,
+          hasMetadata: !!allResults[0].metadata,
+          documentId: allResults[0].document_id,
+          metadataDocId: allResults[0].metadata?.document_id,
+          documentObjectId: allResults[0].document?.id,
+          targetDocumentId: documentId
+        });
+      }
+      
+      // Filter by specific document ID - fix the structure mismatch
       const documentResults = allResults.filter(result => {
-        return result.document.id === documentId;
+        return result.document_id === documentId || 
+               (result.document && result.document.id === documentId) ||
+               (result.metadata && result.metadata.document_id === documentId);
       });
 
       console.log(`🎯 Document search "${query}" in document ${documentId}: ${documentResults.length} results`);
+      
+      // Fallback: If no document-specific results but we have general results, log this issue
+      if (documentResults.length === 0 && allResults.length > 0) {
+        console.warn(`⚠️ Document filtering failed - found ${allResults.length} general results but 0 document-specific results`);
+        console.warn(`⚠️ Temporarily returning all results to maintain functionality while debugging`);
+        // Temporary fallback to prevent complete failure
+        return allResults.slice(0, 3); // Limit to 3 results as fallback
+      }
+      
       return documentResults;
     } catch (error) {
       console.error('❌ Error searching in document:', error);

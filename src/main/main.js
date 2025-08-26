@@ -443,6 +443,15 @@ function setupIPCHandlers() {
     return ragService.clearCurrentPersonaConversations();
   });
 
+  // 💰 Token Budget Management IPC Handlers
+  ipcMain.handle('get-user-token-budget', async () => {
+    return ragService.getUserTokenBudget();
+  });
+
+  ipcMain.handle('set-user-token-budget', async (event, budget) => {
+    return ragService.setUserTokenBudget(budget);
+  });
+
   // Phase 3: Google Vision OCR Configuration (Simplified)
   ipcMain.handle('set-google-vision-service-account', async (event, serviceAccountPath) => {
     try {

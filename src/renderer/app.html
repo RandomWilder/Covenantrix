@@ -125,7 +125,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 95%;
             margin: 0 auto;
             padding: 20px;
         }
@@ -135,7 +135,7 @@
             backdrop-filter: blur(10px);
             border-radius: 15px;
             padding: 20px 30px;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -152,15 +152,27 @@
         .logo-icon {
             width: 32px;
             height: 32px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-image: url('images/logo.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
             border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 18px;
-            font-family: 'Inter', sans-serif;
+            /* Fallback gradient if image fails to load */
+            background-color: #ffffff;
+            /* High DPI support */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+
+        /* Responsive scaling for smaller screens */
+        @media (max-width: 768px) {
+            .logo-icon {
+                width: 28px;
+                height: 28px;
+            }
         }
 
         .header h1 {
@@ -209,8 +221,8 @@
 
         .main-content {
             display: grid;
-            grid-template-columns: 400px 1fr;
-            gap: 30px;
+            grid-template-columns: 1fr 3fr;
+            gap: 10px;
         }
 
         @media (max-width: 1024px) {
@@ -738,6 +750,112 @@
 
         .message-sources {
             direction: ltr;
+        }
+
+        /* 💡 Follow-up Questions Styles */
+        .follow-up-questions {
+            margin-top: 15px;
+            padding: 12px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            direction: ltr;
+        }
+
+        .follow-up-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .questions-grid {
+            display: grid;
+            gap: 8px;
+            grid-template-columns: 1fr;
+        }
+
+        .follow-up-question {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+            font-size: 13px;
+            color: #495057;
+            text-decoration: none;
+        }
+
+        .follow-up-question:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+
+        .question-icon {
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        .question-text {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        /* 📊 Contract Intelligence Styles */
+        .contract-intelligence {
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
+
+        .intelligence-summary {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .contract-type-badge, .risk-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .contract-type-badge {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+
+        .risk-badge {
+            color: white;
+            border: none;
+            /* Background color set inline based on risk level */
+        }
+
+        /* Responsive design for questions */
+        @media (min-width: 600px) {
+            .questions-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (min-width: 900px) {
+            .questions-grid {
+                grid-template-columns: 1fr 1fr 1fr;
+            }
         }
 
         /* Inline Progress Indicator Styles */
@@ -1351,7 +1469,7 @@
             gap: 8px;
             margin-bottom: 12px;
             padding: 8px;
-            background: #f8f9fa;
+            background: #e3e3e3;
             border-radius: 8px;
             border: 1px solid #e2e8f0;
         }
@@ -1419,7 +1537,7 @@
     <div class="container">
         <div class="header">
             <div class="header-left">
-                <div class="logo-icon">C</div>
+                <div class="logo-icon"></div>
                 <h1>Covenantrix</h1>
             </div>
             <div class="header-right">
@@ -1428,7 +1546,7 @@
                         <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.65-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65A.488.488 0 0 0 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11.5c-.04.32-.07.65-.07.97 0 .33.03.65.07.97L2.46 14.97c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.31.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.63Z"/>
                     </svg>
                 </button>
-                <span class="version">v1.2.11</span>
+                <span class="version">v1.2.12</span>
             </div>
         </div>
 
@@ -1497,12 +1615,12 @@
                             <div class="assistant-message">
                                 <div class="message-avatar">AI</div>
                                 <div class="message-content">
-                                    <p>Ready to analyze your contracts. I can help you understand legal documents through natural conversation.</p>
+                                    <p>Ready to analyze your contracts and provide legal assistance. Select your preferred persona above to get started.</p>
                                     <p>Try asking:</p>
                                     <ul style="margin: 8px 0; padding-left: 18px;">
                                         <li>Who are the parties in this agreement?</li>
-                                        <li>What are the payment terms?</li>
-                                        <li>When does this contract expire?</li>
+                                        <li>What are the key risks in this contract?</li>
+                                        <li>How can I improve this clause?</li>
                                         <li>What are the termination conditions?</li>
                                     </ul>
                                 </div>
@@ -1539,6 +1657,9 @@
                 </div>
                 
                 <div class="chat-controls">
+                    <!-- 🎭 AI Team Title -->
+                    <h3 style="margin: 16px 0 8px 0; font-size: 14px; font-weight: 600; color: #4a5568; text-transform: uppercase; letter-spacing: 0.5px; text-align: left;">Your AI Team</h3>
+                    
                     <!-- 🎭 Persona Selector -->
                     <div class="persona-selector" id="persona-selector">
                         <!-- Persona buttons will be populated here -->
@@ -1761,19 +1882,37 @@
             const messagesContainer = document.getElementById('chat-messages');
             
             if (!currentConversationId) {
-                // Clear chat and show welcome message
+                // Clear chat and show persona-specific welcome message
+                let greetingText = '';
+                let exampleQuestions = [];
+                
+                if (currentPersona.id === 'legal_advisor') {
+                    greetingText = 'Ready to analyze your contracts and assess legal risks. I specialize in contract interpretation and compliance review.';
+                    exampleQuestions = [
+                        'Who are the parties in this agreement?',
+                        'What are the key risks in this contract?',
+                        'Are there any missing legal protections?',
+                        'What are the liability limitations?'
+                    ];
+                } else if (currentPersona.id === 'legal_writer') {
+                    greetingText = 'Ready to help you draft and improve legal documents. I specialize in contract writing and clause optimization.';
+                    exampleQuestions = [
+                        'How can I improve this clause?',
+                        'Draft a termination clause for this contract',
+                        'What\'s missing from this agreement?',
+                        'Suggest better wording for this section'
+                    ];
+                }
+                
                 messagesContainer.innerHTML = `
                     <div class="assistant-message welcome-message">
                         <div class="message-avatar">AI</div>
                         <div class="message-content">
                             <p><strong>${currentPersona.icon} ${currentPersona.name}</strong></p>
-                            <p>Ready to analyze your contracts. I can help you understand legal documents through natural conversation.</p>
+                            <p>${greetingText}</p>
                             <p><strong>Try asking:</strong></p>
                             <ul style="margin: 8px 0; padding-left: 20px;">
-                                <li>Who are the parties in this agreement?</li>
-                                <li>What are the payment terms?</li>
-                                <li>When does this contract expire?</li>
-                                <li>What are the termination conditions?</li>
+                                ${exampleQuestions.map(q => `<li>${q}</li>`).join('')}
                             </ul>
                         </div>
                     </div>
@@ -1811,7 +1950,7 @@
                             
                             if (assistantMessage && assistantMessage.role === 'assistant') {
                                 // Add assistant message
-                                addAssistantMessage(assistantMessage.content, [], 'general', false); // Don't scroll yet
+                                addAssistantMessage(assistantMessage.content, [], 'general', null, false); // Don't scroll yet
                             }
                         }
                         
@@ -2870,8 +3009,8 @@
                 // Remove typing indicator
                 removeTypingIndicator(typingId);
                 
-                // Add assistant response to chat
-                addAssistantMessage(response.response, response.sources, response.queryType);
+                // Add assistant response to chat with contract intelligence
+                addAssistantMessage(response.response, response.sources, response.queryType, response.contractIntelligence);
                 
                 console.log(`✅ Received response (${response.response.length} chars)`);
                 
@@ -2883,7 +3022,8 @@
                 addAssistantMessage(
                     `Sorry, I encountered an error processing your question: ${error.message}. Please try again.`,
                     [],
-                    'error'
+                    'error',
+                    null
                 );
             }
             
@@ -2911,7 +3051,7 @@
             }
         }
 
-        function addAssistantMessage(text, sources = [], queryType = 'general', shouldScroll = true) {
+        function addAssistantMessage(text, sources = [], queryType = 'general', contractIntelligence = null, shouldScroll = true) {
             const messagesContainer = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
             const textDirection = detectTextDirection(text);
@@ -2930,12 +3070,53 @@
                     </div>
                 `;
             }
+
+            // Generate follow-up questions HTML
+            let followUpHtml = '';
+            if (contractIntelligence && contractIntelligence.followUpQuestions && contractIntelligence.followUpQuestions.length > 0) {
+                const questions = contractIntelligence.followUpQuestions;
+                followUpHtml = `
+                    <div class="follow-up-questions">
+                        <div class="follow-up-label">💡 Suggested follow-up questions:</div>
+                        <div class="questions-grid">
+                            ${questions.map((question, index) => `
+                                <button class="follow-up-question" onclick="askFollowUpQuestion('${escapeHtml(question).replace(/'/g, "&#39;")}')" 
+                                        title="Click to ask: ${escapeHtml(question)}">
+                                    <span class="question-icon">❓</span>
+                                    <span class="question-text">${escapeHtml(question)}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Generate contract intelligence summary
+            let intelligenceHtml = '';
+            if (contractIntelligence) {
+                const { contractType, riskAnalysis } = contractIntelligence;
+                if (contractType && contractType !== 'general') {
+                    const riskColor = riskAnalysis?.overall === 'HIGH' ? '#e74c3c' : 
+                                     riskAnalysis?.overall === 'MEDIUM' ? '#f39c12' : '#27ae60';
+                    
+                    intelligenceHtml = `
+                        <div class="contract-intelligence">
+                            <div class="intelligence-summary">
+                                <span class="contract-type-badge">📄 ${contractType.replace('_', ' ').toUpperCase()}</span>
+                                ${riskAnalysis ? `<span class="risk-badge" style="background-color: ${riskColor}">⚠️ ${riskAnalysis.overall} RISK</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
             
             messageDiv.innerHTML = `
                 <div class="message-avatar">AI</div>
                 <div class="message-content ${textDirection}">
                     <p>${formatMessageText(text)}</p>
+                    ${intelligenceHtml}
                     ${sourcesHtml}
+                    ${followUpHtml}
                     <div class="message-timestamp">${new Date().toLocaleTimeString()}</div>
                 </div>
             `;
@@ -2943,6 +3124,18 @@
             if (shouldScroll) {
                 scrollToBottom();
             }
+        }
+
+        // Handle follow-up question clicks
+        async function askFollowUpQuestion(question) {
+            const input = document.getElementById('chat-input');
+            input.value = question;
+            
+            // Auto-send the question
+            await sendMessage();
+            
+            // Optional: Add visual feedback
+            console.log(`🔄 Asking follow-up question: "${question}"`);
         }
 
         function showTypingIndicator() {

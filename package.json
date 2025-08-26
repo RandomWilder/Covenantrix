@@ -1,6 +1,6 @@
 {
   "name": "contract-rag-manager",
-  "version": "1.2.11",
+  "version": "1.2.12",
   "description": "AI-Powered Contract Analysis with Conversational RAG Interface",
   "author": "RandomWilder",
   "main": "src/main/main.js",
@@ -16,12 +16,15 @@
     "appId": "com.covenantrix.contract-rag-manager",
     "productName": "Covenantrix",
     "directories": {
+      "buildResources": "buildResources",
       "output": "dist"
     },
+    "icon": "buildResources/icon",
     "asarUnpack": [
       "**/*.node"
     ],
     "win": {
+      "icon": "buildResources/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -36,6 +39,7 @@
       "artifactName": "${productName}-${version}-Setup.${ext}"
     },
     "mac": {
+      "icon": "buildResources/icon.icns",
       "category": "public.app-category.productivity",
       "target": [
         {

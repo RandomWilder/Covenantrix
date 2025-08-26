@@ -70,6 +70,11 @@ class RAGService {
     return this.personaService.generatePersonaPrompt(query, context, queryType);
   }
 
+  // Generate budget-aware prompt using PersonaService
+  generateBudgetAwarePrompt(query, context, queryType, confidenceScore) {
+    return this.personaService.generateBudgetAwarePrompt(query, context, queryType, confidenceScore);
+  }
+
   // Alternative minimal prompt for high-confidence scenarios
   generateMinimalPrompt(query, context, queryType = 'general') {
     const minimalInstructions = `Legal analyst. Respond in user's language. ${queryType}: ${query}
@@ -81,17 +86,21 @@ Analysis:`;
     return minimalInstructions;
   }
 
-  // Smart prompt selection based on confidence and complexity
+  // Smart prompt selection based on confidence, complexity, and budget
   selectOptimalPrompt(query, context, queryType, confidenceScore) {
-    // Use minimal prompt for high-confidence, simple queries
-    if (confidenceScore.overall >= 0.8 && query.length < 50 && 
-        ['parties', 'dates', 'payment'].includes(queryType)) {
-      console.log('📝 Using minimal prompt for high-confidence simple query');
-      return this.generateMinimalPrompt(query, context, queryType);
-    }
+    // Try budget-aware prompt first
+    const budgetAwarePrompt = this.generateBudgetAwarePrompt(query, context, queryType, confidenceScore.overall);
     
-    // Use full prompt for complex or low-confidence queries
-    return this.generatePrompt(query, context, queryType);
+    // Validate prompt fits within budget
+    if (this.personaService.validatePromptBudget(budgetAwarePrompt)) {
+      const budget = this.personaService.getUserTokenBudget();
+      console.log(`💰 Using ${budget.budgetTier} budget-aware prompt (${this.estimateTokens(budgetAwarePrompt)} tokens)`);
+      return budgetAwarePrompt;
+    }
+
+    // Fallback to minimal prompt if budget exceeded
+    console.log('⚠️ Budget exceeded, falling back to minimal prompt');
+    return this.generateMinimalPrompt(query, context, queryType);
   }
 
   // Estimate token count (rough approximation: 1 token ≈ 4 characters)
@@ -111,37 +120,54 @@ Analysis:`;
     return { promptTokens, responseTokens, totalTokens, estimatedCost, isMinimal };
   }
 
-  // Advanced contract type classification
+  // Advanced contract type classification with multilingual support
   classifyContractType(searchResults) {
     if (!searchResults || searchResults.length === 0) return 'unknown';
     
     const contractPatterns = {
       employment: {
-        keywords: ['employee', 'salary', 'benefits', 'position', 'termination', 'non-compete', 'employment agreement'],
+        english: ['employee', 'salary', 'benefits', 'position', 'termination', 'non-compete', 'employment agreement', 'job', 'work'],
+        hebrew: ['עובד', 'משכורת', 'זכויות', 'תפקיד', 'סיום עבודה', 'הסכם עבודה', 'עבודה', 'עובדים', 'מעסיק', 'מעביד'],
         weight: 0
       },
       saas: {
-        keywords: ['software', 'service', 'subscription', 'API', 'uptime', 'SLA', 'cloud', 'platform'],
+        english: ['software', 'service', 'subscription', 'API', 'uptime', 'SLA', 'cloud', 'platform', 'system', 'application'],
+        hebrew: ['תוכנה', 'שירות', 'מנוי', 'מערכת', 'פלטפורמה', 'אפליקציה', 'מחשב', 'דיגיטלי', 'טכנולוגי'],
         weight: 0
       },
       nda: {
-        keywords: ['confidential', 'non-disclosure', 'proprietary', 'trade secret', 'confidentiality agreement'],
+        english: ['confidential', 'non-disclosure', 'proprietary', 'trade secret', 'confidentiality agreement', 'secret'],
+        hebrew: ['סודי', 'סודיות', 'הסכם סודיות', 'מידע סודי', 'סוד מסחרי', 'חסוי', 'אי גילוי'],
         weight: 0
       },
       real_estate: {
-        keywords: ['property', 'lease', 'rent', 'premises', 'landlord', 'tenant', 'real estate'],
+        english: ['property', 'lease', 'rent', 'premises', 'landlord', 'tenant', 'real estate', 'apartment', 'building'],
+        hebrew: ['נכס', 'שכירות', 'דירה', 'בניין', 'משכיר', 'שוכר', 'נדלן', 'מקרקעין', 'דמי שכירות'],
         weight: 0
       },
       services: {
-        keywords: ['services', 'consulting', 'professional', 'deliverables', 'milestones', 'work order'],
+        english: ['services', 'consulting', 'professional', 'deliverables', 'milestones', 'work order', 'contractor'],
+        hebrew: ['שירותים', 'ייעוץ', 'יעץ', 'קבלן', 'עבודות', 'שירות', 'מתן שירותים', 'יועץ'],
         weight: 0
       },
       procurement: {
-        keywords: ['purchase', 'supplier', 'goods', 'delivery', 'warranty', 'procurement', 'vendor'],
+        english: ['purchase', 'supplier', 'goods', 'delivery', 'warranty', 'procurement', 'vendor', 'buy', 'order'],
+        hebrew: ['קנייה', 'רכישה', 'ספק', 'סחורה', 'אספקה', 'משלוח', 'אחריות', 'זמנה', 'הזמנה'],
         weight: 0
       },
       partnership: {
-        keywords: ['partnership', 'joint venture', 'collaboration', 'alliance', 'partner'],
+        english: ['partnership', 'joint venture', 'collaboration', 'alliance', 'partner', 'cooperation'],
+        hebrew: ['שותפות', 'שותף', 'שיתוף פעולה', 'שותפים', 'בריתות', 'קואופרציה', 'משותף'],
+        weight: 0
+      },
+      loan: {
+        english: ['loan', 'credit', 'lending', 'borrower', 'lender', 'interest', 'mortgage', 'finance'],
+        hebrew: ['הלוואה', 'אשראי', 'משכנתה', 'לוה', 'מלווה', 'ריבית', 'מימון', 'כספי'],
+        weight: 0
+      },
+      distribution: {
+        english: ['distribution', 'distributor', 'reseller', 'sales', 'territory', 'exclusive', 'agent'],
+        hebrew: ['הפצה', 'מפיץ', 'מכירות', 'זכיינות', 'בלעדיות', 'סוכן', 'נציג'],
         weight: 0
       }
     };
@@ -154,12 +180,30 @@ Analysis:`;
       return result.text || '';
     }).join(' ').toLowerCase();
 
-    // Calculate pattern weights
+    // Calculate pattern weights for both Hebrew and English
     for (const [type, pattern] of Object.entries(contractPatterns)) {
-      pattern.keywords.forEach(keyword => {
-        const matches = (fullText.match(new RegExp(keyword, 'gi')) || []).length;
-        pattern.weight += matches;
-      });
+      // Check English keywords
+      if (pattern.english) {
+        pattern.english.forEach(keyword => {
+          const matches = (fullText.match(new RegExp(keyword, 'gi')) || []).length;
+          pattern.weight += matches;
+        });
+      }
+      
+      // Check Hebrew keywords (case-sensitive for Hebrew)
+      if (pattern.hebrew) {
+        const originalText = searchResults.map(result => {
+          if (result.chunks) {
+            return result.chunks.map(chunk => chunk.text).join(' ');
+          }
+          return result.text || '';
+        }).join(' ');
+        
+        pattern.hebrew.forEach(keyword => {
+          const matches = (originalText.match(new RegExp(keyword, 'g')) || []).length;
+          pattern.weight += matches * 1.2; // Slight Hebrew bonus for better matching
+        });
+      }
     }
 
     // Find best match
@@ -183,16 +227,24 @@ Analysis:`;
 
     const riskPatterns = {
       high_risk: {
-        keywords: ['unlimited liability', 'penalty', 'liquidated damages', 'indemnif', 'automatic renewal', 'non-compete'],
+        english: ['unlimited liability', 'penalty', 'liquidated damages', 'indemnif', 'automatic renewal', 'non-compete', 'severe'],
+        hebrew: ['אחריות בלתי מוגבלת', 'קנס', 'פיצויים קבועים', 'שיפוי', 'חידוש אוטומטי', 'איסור תחרות', 'חמור'],
         impact: 3
       },
       medium_risk: {
-        keywords: ['termination fee', 'exclusivity', 'governing law', 'dispute resolution', 'force majeure'],
+        english: ['termination fee', 'exclusivity', 'governing law', 'dispute resolution', 'force majeure', 'breach'],
+        hebrew: ['דמי סיום', 'בלעדיות', 'דין החל', 'יישוב סכסוכים', 'כוח עליון', 'הפרה'],
         impact: 2
       },
       compliance_risk: {
-        keywords: ['gdpr', 'hipaa', 'sox', 'regulatory', 'compliance', 'audit'],
+        english: ['gdpr', 'hipaa', 'sox', 'regulatory', 'compliance', 'audit', 'regulation'],
+        hebrew: ['תקנות', 'ציות', 'ביקורת', 'רגולציה', 'חוקי', 'פיקוח', 'תקינות'],
         impact: 2
+      },
+      financial_risk: {
+        english: ['guarantee', 'security', 'collateral', 'deposit', 'credit', 'debt', 'payment default'],
+        hebrew: ['ערבות', 'בטחון', 'פיקדון', 'אשראי', 'חוב', 'אי תשלום', 'ביטחונות'],
+        impact: 2.5
       }
     };
 
@@ -203,19 +255,33 @@ Analysis:`;
       return result.text || '';
     }).join(' ').toLowerCase();
 
-    // Analyze risk patterns
+    // Get original text for Hebrew pattern matching
+    const originalText = searchResults.map(result => {
+      if (result.chunks) {
+        return result.chunks.map(chunk => chunk.text).join(' ');
+      }
+      return result.text || '';
+    }).join(' ');
+
+    // Analyze risk patterns (Hebrew and English)
     for (const [riskLevel, pattern] of Object.entries(riskPatterns)) {
-      pattern.keywords.forEach(keyword => {
-        if (fullText.includes(keyword)) {
-          if (riskLevel.includes('compliance')) {
-            riskFactors.compliance.score += pattern.impact;
-            riskFactors.compliance.issues.push(keyword);
-          } else {
-            riskFactors.legal.score += pattern.impact;
-            riskFactors.legal.issues.push(keyword);
+      // Check English patterns
+      if (pattern.english) {
+        pattern.english.forEach(keyword => {
+          if (fullText.includes(keyword)) {
+            this.categorizeRisk(riskLevel, keyword, pattern.impact, riskFactors);
           }
-        }
-      });
+        });
+      }
+      
+      // Check Hebrew patterns
+      if (pattern.hebrew) {
+        pattern.hebrew.forEach(keyword => {
+          if (originalText.includes(keyword)) {
+            this.categorizeRisk(riskLevel, keyword, pattern.impact * 1.1, riskFactors); // Slight Hebrew bonus
+          }
+        });
+      }
     }
 
     // Contract-type specific risk analysis
@@ -247,72 +313,114 @@ Analysis:`;
     };
   }
 
-  // Generate intelligent follow-up questions based on context
+  // Generate intelligent follow-up questions based on context (multilingual)
   generateFollowUpQuestions(queryType, contractType, riskAnalysis, queryLanguage = 'english') {
     const baseQuestions = {
-      parties: [
+      parties: queryLanguage === 'hebrew' ? [
+        'מי הם הערבים או החברות הבנות?',
+        'מה קורה אם צד נרכש על ידי חברה אחרת?',
+        'האם יש צדדים שלישיים מוטבים?'
+      ] : [
         'Who are the guarantors or subsidiaries?',
         'What happens if a party is acquired?',
         'Are there any third-party beneficiaries?'
       ],
-      payment: [
+      payment: queryLanguage === 'hebrew' ? [
+        'מה הקנסות על איחור בתשלום?',
+        'האם יש הליך יישוב סכסוכים לבעיות תשלום?',
+        'האם יש התאמות תשלום אוטומטיות?'
+      ] : [
         'What are the penalties for late payment?',
         'Is there a dispute resolution process for payment issues?',
         'Are there any automatic payment adjustments?'
       ],
-      termination: [
+      termination: queryLanguage === 'hebrew' ? [
+        'איזה זמן הודעה נדרש?',
+        'אילו התחייבויות שורדות את הסיום?',
+        'האם יש דמי סיום?'
+      ] : [
         'What notice period is required?',
         'What obligations survive termination?',
         'Are there any termination fees?'
       ],
-      liability: [
+      liability: queryLanguage === 'hebrew' ? [
+        'מה הם מגבלות האחריות?',
+        'האם יש חריגים מההגבלה?',
+        'איך עובד השיפוי?'
+      ] : [
         'What are the liability caps?',
         'Are there any carve-outs from limitation?',
         'How does indemnification work?'
       ],
-      risk_assessment: [
+      risk_assessment: queryLanguage === 'hebrew' ? [
+        'מה הסיכונים הגדולים ביותר בחוזה הזה?',
+        'איך אפשר למתן את הסיכונים האלו?',
+        'האם יש תנאים חריגים?'
+      ] : [
         'What are the biggest risks in this contract?',
         'How can these risks be mitigated?',
         'Are there any unusual terms?'
       ]
     };
 
-    // Contract-type specific questions
+    // Contract-type specific questions (multilingual)
     const contractSpecificQuestions = {
-      employment: [
+      employment: queryLanguage === 'hebrew' ? [
+        'מה האיסורים והמגבלות?',
+        'אילו זכויות כלולות?',
+        'איך עובד הסיום?'
+      ] : [
         'What are the restrictive covenants?',
         'What benefits are included?',
         'How does termination work?'
+      ],
+      real_estate: queryLanguage === 'hebrew' ? [
+        'מי אחראי על התחזוקה?',
+        'מה תנאי החידוש?',
+        'האם יש הגבלות על השימוש?'
+      ] : [
+        'Who handles maintenance?',
+        'What are the renewal terms?',
+        'Are there any restrictions on use?'
+      ],
+      nda: queryLanguage === 'hebrew' ? [
+        'איזה מידע נחשב סודי?',
+        'כמה זמן נמשכת הסודיות?',
+        'מה הגילויים המותרים?'
+      ] : [
+        'What information is considered confidential?',
+        'How long does confidentiality last?',
+        'What are the permitted disclosures?'
       ],
       saas: [
         'What are the SLA requirements?',
         'How is data handled?',
         'What happens during downtime?'
-      ],
-      nda: [
-        'What information is considered confidential?',
-        'How long does confidentiality last?',
-        'What are the permitted disclosures?'
-      ],
-      real_estate: [
-        'Who handles maintenance?',
-        'What are the renewal terms?',
-        'Are there any restrictions on use?'
       ]
     };
 
-    // Risk-based questions
+    // Risk-based questions (multilingual)
     const riskBasedQuestions = {
-      HIGH: [
+      HIGH: queryLanguage === 'hebrew' ? [
+        'מה ההוראות עם הסיכון הגבוה ביותר?',
+        'איך אפשר למתן את הסיכונים האלה?',
+        'האם כדאי לנהל משא ומתן על התנאים האלה?'
+      ] : [
         'What are the highest risk provisions?',
         'How can we mitigate these risks?',
         'Should we negotiate these terms?'
       ],
-      MEDIUM: [
+      MEDIUM: queryLanguage === 'hebrew' ? [
+        'האם יש הוראות מדאיגות?',
+        'על מה כדאי לעקוב בהמשך?'
+      ] : [
         'Are there any concerning provisions?',
         'What should we monitor going forward?'
       ],
-      LOW: [
+      LOW: queryLanguage === 'hebrew' ? [
+        'האם יש הזדמנויות לייעול?',
+        'מה דרישות הביצוע המרכזיות?'
+      ] : [
         'Are there any optimization opportunities?',
         'What are the key performance requirements?'
       ]
@@ -400,39 +508,104 @@ Analysis:`;
     return 'english'; // Default fallback
   }
 
-  // Detect query intent for better prompt selection with advanced categories
+  // Detect query intent for better prompt selection with multilingual support
   detectQueryType(query) {
     const queryLower = query.toLowerCase();
     
-    // Enhanced query type detection with priority order (more specific first)
+    // Enhanced query type detection with Hebrew & English patterns
     const queryPatterns = {
-      'interpretation': ['mean', 'interpret', 'unclear', 'define', 'explain', 'understand', 'clarify', 'ambiguous'],
-      'enforceability': ['enforce', 'binding', 'valid', 'legal effect', 'enforceable', 'legally binding'],
-      'compliance': ['comply', 'regulation', 'requirement', 'law', 'regulatory', 'legal requirement'],
-      'risk_assessment': ['risk', 'danger', 'problem', 'issue', 'concern', 'potential problem'],
-      'breach': ['violate', 'breach', 'default', 'non-compliance', 'violation', 'breaking'],
-      'amendment': ['change', 'modify', 'amend', 'alter', 'update', 'revision'],
-      
-      // Original categories enhanced
-      'parties': ['parties', 'who', 'entity', 'company', 'contracting parties', 'signatories'],
-      'payment': ['payment', 'money', 'cost', 'fee', 'price', 'amount', 'financial', 'invoice'],
-      'dates': ['date', 'when', 'deadline', 'expire', 'timeline', 'schedule', 'time'],
-      'termination': ['terminate', 'end', 'cancel', 'expiry', 'conclusion', 'dissolution'],
-      'liability': ['liability', 'responsible', 'indemnif', 'liable', 'accountability', 'fault'],
-      'confidentiality': ['confidential', 'secret', 'disclosure', 'private', 'proprietary', 'non-disclosure'],
-      'terms': ['term', 'condition', 'clause', 'provision', 'stipulation', 'requirement']
+      'interpretation': {
+        english: ['mean', 'interpret', 'unclear', 'define', 'explain', 'understand', 'clarify', 'ambiguous'],
+        hebrew: ['משמעות', 'פירוש', 'מה זה אומר', 'להבין', 'להסביר', 'לפרש', 'מה הכוונה', 'פירושו']
+      },
+      'enforceability': {
+        english: ['enforce', 'binding', 'valid', 'legal effect', 'enforceable', 'legally binding'],
+        hebrew: ['אכיפה', 'ואכיפ', 'מחייב', 'תוקף', 'בתוקף', 'תקף', 'חוקי', 'מחייבות']
+      },
+      'compliance': {
+        english: ['comply', 'regulation', 'requirement', 'law', 'regulatory', 'legal requirement'],
+        hebrew: ['ציות', 'תקנה', 'דרישה', 'חוק', 'חובה', 'חוקי', 'הוראות', 'חוקים']
+      },
+      'risk_assessment': {
+        english: ['risk', 'danger', 'problem', 'issue', 'concern', 'potential problem'],
+        hebrew: ['סיכון', 'סכנה', 'בעיה', 'בעיות', 'חשש', 'דאגה', 'סיכונים', 'בעיתי']
+      },
+      'breach': {
+        english: ['violate', 'breach', 'default', 'non-compliance', 'violation', 'breaking'],
+        hebrew: ['הפרה', 'הפר', 'מפר', 'חלף', 'עבירה', 'הפרות', 'מפירה']
+      },
+      'amendment': {
+        english: ['change', 'modify', 'amend', 'alter', 'update', 'revision'],
+        hebrew: ['שינוי', 'תיקון', 'עדכון', 'שנה', 'לשנות', 'תיקונים', 'שינויים', 'לתקן']
+      },
+      'parties': {
+        english: ['parties', 'who', 'entity', 'company', 'contracting parties', 'signatories'],
+        hebrew: ['צדדים', 'צד', 'מי', 'גורם', 'חברה', 'הצדדים', 'חותמים', 'בעלי']
+      },
+      'payment': {
+        english: ['payment', 'money', 'cost', 'fee', 'price', 'amount', 'financial', 'invoice'],
+        hebrew: ['תשלום', 'כסף', 'עלות', 'דמי', 'מחיר', 'סכום', 'כספי', 'חשבון', 'תשלומים']
+      },
+      'dates': {
+        english: ['date', 'when', 'deadline', 'expire', 'timeline', 'schedule', 'time'],
+        hebrew: ['תאריך', 'מתי', 'תאריכים', 'פג', 'לוח זמנים', 'זמן', 'מועד', 'תאריכי']
+      },
+      'termination': {
+        english: ['terminate', 'end', 'cancel', 'expiry', 'conclusion', 'dissolution'],
+        hebrew: ['סיום', 'סיים', 'לסיים', 'ביטול', 'ביטל', 'פקיעה', 'סיימת', 'פקע']
+      },
+      'liability': {
+        english: ['liability', 'responsible', 'indemnif', 'liable', 'accountability', 'fault'],
+        hebrew: ['אחריות', 'אחראי', 'חבות', 'חב', 'שיפוי', 'פיצוי', 'חבים', 'נזק']
+      },
+      'confidentiality': {
+        english: ['confidential', 'secret', 'disclosure', 'private', 'proprietary', 'non-disclosure'],
+        hebrew: ['סודי', 'סודיות', 'סוד', 'חשוף', 'חשיפה', 'פרטי', 'גילוי', 'חסוי']
+      },
+      'terms': {
+        english: ['term', 'condition', 'clause', 'provision', 'stipulation', 'requirement'],
+        hebrew: ['תנאי', 'תנאים', 'הוראה', 'סעיף', 'הוראות', 'סעיפים', 'תניה', 'תנאיי']
+      }
     };
 
-    // Check each pattern type for matches
-    for (const [type, keywords] of Object.entries(queryPatterns)) {
-      for (const keyword of keywords) {
-        if (queryLower.includes(keyword)) {
-          return type;
+    // Check each pattern type for matches (Hebrew and English)
+    for (const [type, patterns] of Object.entries(queryPatterns)) {
+      // Check Hebrew patterns
+      if (patterns.hebrew) {
+        for (const keyword of patterns.hebrew) {
+          if (query.includes(keyword)) {
+            return type;
+          }
+        }
+      }
+      // Check English patterns
+      if (patterns.english) {
+        for (const keyword of patterns.english) {
+          if (queryLower.includes(keyword)) {
+            return type;
+          }
         }
       }
     }
     
     return 'general';
+  }
+
+  // Helper method to categorize risk factors
+  categorizeRisk(riskLevel, keyword, impact, riskFactors) {
+    if (riskLevel.includes('compliance')) {
+      riskFactors.compliance.score += impact;
+      riskFactors.compliance.issues.push(keyword);
+    } else if (riskLevel.includes('financial')) {
+      riskFactors.financial.score += impact;
+      riskFactors.financial.issues.push(keyword);
+    } else if (riskLevel.includes('operational')) {
+      riskFactors.operational.score += impact;
+      riskFactors.operational.issues.push(keyword);
+    } else {
+      riskFactors.legal.score += impact;
+      riskFactors.legal.issues.push(keyword);
+    }
   }
 
   // Format context from search results for LLM with professional citations
@@ -493,10 +666,14 @@ Analysis:`;
       };
     }
 
-    // 1. Source Relevance (40% weight)
+    // 1. Source Relevance (35% weight) - enhanced for multilingual
     const avgSimilarity = searchResults.reduce((sum, result) => 
       sum + (result.avgSimilarity || result.similarity || 0), 0) / searchResults.length;
-    const sourceRelevance = Math.min(avgSimilarity, 1.0);
+    
+    // Boost confidence for specialized queries and better matching
+    const sourceRelevance = queryType !== 'general' ? 
+      Math.min(avgSimilarity * 1.6, 1.0) : // Specialized queries get bonus
+      Math.min(avgSimilarity * 1.3, 1.0);
 
     // 2. Context Completeness (30% weight)
     const totalChunks = searchResults.reduce((sum, result) => 
@@ -512,21 +689,21 @@ Analysis:`;
     const queryLength = query.length;
     const responseQuality = queryLength > 10 && queryLength < 200 ? 0.8 : 0.6;
 
-    // Calculate weighted overall score
-    const overall = (sourceRelevance * 0.4) + 
-                   (contextCompleteness * 0.3) + 
+    // Calculate weighted overall score (adjusted weights)
+    const overall = (sourceRelevance * 0.45) + 
+                   (contextCompleteness * 0.25) + 
                    (queryTypeConfidence * 0.2) + 
                    (responseQuality * 0.1);
 
-    // Determine confidence level and explanation
+    // Determine confidence level and explanation (adjusted thresholds for multilingual)
     let level, explanation;
-    if (overall >= 0.8) {
+    if (overall >= 0.75) {
       level = 'HIGH';
       explanation = 'Strong source relevance with comprehensive context';
-    } else if (overall >= 0.6) {
+    } else if (overall >= 0.55) {
       level = 'MEDIUM';
       explanation = 'Good source matches with adequate context';
-    } else if (overall >= 0.4) {
+    } else if (overall >= 0.35) {
       level = 'LOW';
       explanation = 'Limited source relevance or incomplete context';
     } else {
@@ -848,6 +1025,18 @@ Analysis:`;
   // Get all available personas
   getAllPersonas() {
     return this.personaService.getAllPersonas();
+  }
+
+  // 💰 TOKEN BUDGET MANAGEMENT METHODS
+
+  // Get user's token budget settings
+  getUserTokenBudget() {
+    return this.personaService.getUserTokenBudget();
+  }
+
+  // Set user's token budget settings
+  setUserTokenBudget(budget) {
+    return this.personaService.setUserTokenBudget(budget);
   }
 
   // Switch to a different persona
