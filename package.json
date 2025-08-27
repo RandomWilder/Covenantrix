@@ -1,6 +1,6 @@
 {
   "name": "contract-rag-manager",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "AI-Powered Contract Analysis with Conversational RAG Interface",
   "author": "RandomWilder",
   "main": "src/main/main.js",
@@ -65,7 +65,7 @@
       "shortcutName": "Covenantrix"
     },
     "dmg": {
-      "writeUpdateInfo": false,
+      "writeUpdateInfo": true,
       "format": "UDZO"
     },
     "publish": [
@@ -89,6 +89,7 @@
     "rtf-parser": "^1.3.3",
     "sharp": "^0.33.2",
     "tesseract.js": "^5.0.4",
+    "textract": "^2.5.0",
     "uuid": "^9.0.1",
     "xlsx": "^0.18.5"
   },

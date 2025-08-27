@@ -54,7 +54,7 @@ const App = () => {
     <div className="app">
       <header className="app-header">
         <h1>Covenantrix</h1>
-        <span className="version">v1.3.2</span>
+        <span className="version">v1.3.3</span>
       </header>
 
       <div className="main-content">

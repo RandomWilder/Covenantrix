@@ -43,7 +43,7 @@ class VectorService {
         this.vectorStore.set('chunks', {});
         this.vectorStore.set('metadata', {
           created: new Date().toISOString(),
-          version: '1.3.2',
+          version: '1.3.3',
           description: 'Contract document chunks for semantic search'
         });
         console.log('📚 New vector database created');

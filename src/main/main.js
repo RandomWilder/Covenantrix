@@ -16,9 +16,13 @@ let ocrService;
 if (!app.isPackaged) {
   console.log('Development mode - auto-updater disabled');
 } else {
+  console.log('🔄 Auto-updater enabled in production mode');
+  console.log('📍 Update feed URL:', autoUpdater.getFeedURL());
+  
   // Check for updates every hour
   setInterval(() => {
-    autoUpdater.checkForUpdatesAndNotify();
+    console.log('⏰ Scheduled update check...');
+    autoUpdater.checkForUpdates();
   }, 60 * 60 * 1000);
 }
 
@@ -35,8 +39,25 @@ autoUpdater.on('update-available', (info) => {
       type: 'info',
       title: 'Update Available',
       message: `Version ${info.version} is available!`,
-      detail: 'The update will be downloaded in the background.',
-      buttons: ['OK']
+      detail: 'Would you like to download and install the update now?',
+      buttons: ['Download Now', 'Later']
+    }).then((result) => {
+      if (result.response === 0) {
+        // User chose "Download Now" - start the download
+        console.log('User chose to download update');
+        autoUpdater.downloadUpdate();
+        // Show downloading progress dialog
+        dialog.showMessageBox(mainWindow, {
+          type: 'info',
+          title: 'Downloading Update',
+          message: 'Download is in progress...',
+          detail: 'Please wait while the update is downloaded. You will be notified when it\'s ready to install.',
+          buttons: ['OK']
+        });
+      } else {
+        // User chose "Later" - do nothing, no download
+        console.log('User chose to skip update');
+      }
     });
   }
 });
@@ -46,14 +67,33 @@ autoUpdater.on('update-not-available', (info) => {
 });
 
 autoUpdater.on('error', (err) => {
-  console.log('Error in auto-updater:', err);
+  console.error('Error in auto-updater:', err);
+  
+  if (mainWindow) {
+    dialog.showMessageBox(mainWindow, {
+      type: 'error',
+      title: 'Update Error',
+      message: 'Failed to check for updates',
+      detail: `Error: ${err.message}\n\nPlease try again later or download the update manually from our website.`,
+      buttons: ['OK']
+    });
+  }
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
   let logMessage = `Download speed: ${progressObj.bytesPerSecond}`;
-  logMessage += ` - Downloaded ${progressObj.percent}%`;
-  logMessage += ` (${progressObj.transferred}/${progressObj.total})`;
+  logMessage += ` - Downloaded ${progressObj.percent.toFixed(1)}%`;
+  logMessage += ` (${Math.round(progressObj.transferred/1024/1024)}MB/${Math.round(progressObj.total/1024/1024)}MB)`;
   console.log(logMessage);
+  
+  // Send progress to renderer process if needed
+  if (mainWindow) {
+    mainWindow.webContents.send('update-progress', {
+      percent: Math.round(progressObj.percent),
+      transferred: Math.round(progressObj.transferred/1024/1024),
+      total: Math.round(progressObj.total/1024/1024)
+    });
+  }
 });
 
 autoUpdater.on('update-downloaded', (info) => {
@@ -61,14 +101,19 @@ autoUpdater.on('update-downloaded', (info) => {
   
   if (mainWindow) {
     dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Update Ready',
-      message: `Version ${info.version} has been downloaded!`,
-      detail: 'The application will restart to apply the update.',
-      buttons: ['Restart Now', 'Later']
+      type: 'question',
+      title: 'Update Downloaded Successfully',
+      message: `Version ${info.version} is ready to install!`,
+      detail: 'The application needs to restart to apply the update. All your work will be saved.',
+      buttons: ['Restart Now', 'Restart Later'],
+      defaultId: 0,
+      cancelId: 1
     }).then((result) => {
       if (result.response === 0) {
+        console.log('User chose to restart now');
         autoUpdater.quitAndInstall();
+      } else {
+        console.log('User chose to restart later');
       }
     });
   }
@@ -95,7 +140,7 @@ function createWindow() {
     // Check for updates on startup (production only)
     if (app.isPackaged) {
       setTimeout(() => {
-        autoUpdater.checkForUpdatesAndNotify();
+        autoUpdater.checkForUpdates();
       }, 3000);
     }
   });

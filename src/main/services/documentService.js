@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
+const textract = require('textract');
 const XLSX = require('xlsx');
 const rtfParser = require('rtf-parser');
 const Store = require('electron-store');
@@ -198,7 +199,7 @@ class DocumentService {
         reportProgress('text_extraction', { stage: 'word_extraction' });
         metadata.processingSteps.push({ step: 'word_extraction_started', timestamp: new Date().toISOString() });
         
-        const wordResult = await this.extractTextFromWord(buffer, fileName);
+        const wordResult = await this.extractTextFromWord(buffer, fileName, workingFilePath);
         extractedText = wordResult.text;
         metadata.processingSteps.push({ step: 'word_extraction_completed', timestamp: new Date().toISOString() });
         
@@ -586,25 +587,59 @@ class DocumentService {
     }
   }
 
-  async extractTextFromWord(buffer, fileName) {
+  async extractTextFromWord(buffer, fileName, filePath = null) {
     try {
-      console.log(`Extracting text from Word document: ${fileName}`);
-      const result = await mammoth.extractRawText({ buffer: buffer });
-      const extractedText = result.value.trim();
+      const fileExt = path.extname(fileName).toLowerCase();
+      console.log(`Extracting text from Word document: ${fileName} (${fileExt})`);
       
-      if (result.messages && result.messages.length > 0) {
-        console.warn('Word extraction warnings:', result.messages.map(m => m.message).join(', '));
+      if (fileExt === '.docx') {
+        // Use mammoth for newer .docx files
+        const result = await mammoth.extractRawText({ buffer: buffer });
+        const extractedText = result.value.trim();
+        
+        if (result.messages && result.messages.length > 0) {
+          console.warn('Word extraction warnings:', result.messages.map(m => m.message).join(', '));
+        }
+        
+        console.log(`DOCX extraction successful: ${extractedText.length} characters`);
+        return {
+          text: extractedText,
+          wordCount: extractedText.split(/\s+/).filter(word => word.length > 0).length,
+          confidence: 100,
+          language: 'unknown',
+          engine: 'mammoth',
+          processingTime: 0
+        };
+      } else if (fileExt === '.doc') {
+        // Use textract for legacy .doc files
+        return new Promise((resolve, reject) => {
+          if (!filePath) {
+            reject(new Error('File path is required for .doc file processing'));
+            return;
+          }
+          
+          textract.fromFileWithPath(filePath, (error, text) => {
+            if (error) {
+              reject(new Error(`DOC file extraction failed: ${error.message}`));
+              return;
+            }
+            
+            const extractedText = text.trim();
+            console.log(`DOC extraction successful: ${extractedText.length} characters`);
+            
+            resolve({
+              text: extractedText,
+              wordCount: extractedText.split(/\s+/).filter(word => word.length > 0).length,
+              confidence: 95, // Textract is very reliable but not perfect
+              language: 'unknown',
+              engine: 'textract',
+              processingTime: 0
+            });
+          });
+        });
+      } else {
+        throw new Error(`Unsupported Word format: ${fileExt}. Supported: .doc, .docx`);
       }
-      
-      console.log(`Word extraction successful: ${extractedText.length} characters`);
-      return {
-        text: extractedText,
-        wordCount: extractedText.split(/\s+/).filter(word => word.length > 0).length,
-        confidence: 100, // Word documents have perfect text extraction
-        language: 'unknown', // Could add language detection here
-        engine: 'mammoth',
-        processingTime: 0
-      };
     } catch (error) {
       throw new Error(`Word document extraction failed: ${error.message}`);
     }
