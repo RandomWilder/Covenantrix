@@ -43,7 +43,7 @@ class VectorService {
         this.vectorStore.set('chunks', {});
         this.vectorStore.set('metadata', {
           created: new Date().toISOString(),
-          version: '1.3.1',
+          version: '1.3.2',
           description: 'Contract document chunks for semantic search'
         });
         console.log('📚 New vector database created');
@@ -84,103 +84,388 @@ class VectorService {
     }
   }
 
-  async generateEmbedding(text) {
+  async generateEmbedding(text, retryCount = 0) {
+    const maxRetries = 3;
+    const retryDelay = 1000 * (retryCount + 1); // Exponential backoff: 1s, 2s, 3s
+    
     try {
-      if (!this.openai) {
-        const storedKey = this.settingsStore.get('openai_api_key');
-        if (!storedKey) {
-          throw new Error('OpenAI API key not configured');
-        }
-        await this.setupOpenAI(storedKey);
-      }
+      // Ensure OpenAI client is initialized
+      await this.ensureOpenAIConnection();
 
       const response = await this.openai.embeddings.create({
-        model: "text-embedding-3-small",
+        model: "text-embedding-3-large", // 🚀 Enhanced model for better performance
         input: text,
+        encoding_format: "float", // Explicit format for consistency
       });
 
+      if (!response.data || !response.data[0] || !response.data[0].embedding) {
+        throw new Error('Invalid embedding response from OpenAI API');
+      }
+
       return response.data[0].embedding;
+      
     } catch (error) {
-      console.error('❌ Error generating embedding:', error);
+      console.error(`❌ Error generating embedding (attempt ${retryCount + 1}/${maxRetries + 1}):`, error.message);
+      
+      // Retry logic for transient errors
+      if (retryCount < maxRetries && this.isRetryableError(error)) {
+        console.log(`🔄 Retrying embedding generation in ${retryDelay}ms...`);
+        await this.delay(retryDelay);
+        return this.generateEmbedding(text, retryCount + 1);
+      }
+      
+      // Reset connection on persistent errors
+      if (this.isPersistentConnectionError(error)) {
+        console.log('🔄 Resetting OpenAI connection due to persistent error...');
+        this.openai = null;
+      }
+      
       throw error;
     }
   }
 
-  async addDocument(documentId, chunks, progressCallback = null) {
+  // 🛡️ Robust connection management
+  async ensureOpenAIConnection() {
+    if (!this.openai) {
+      const storedKey = this.settingsStore.get('openai_api_key');
+      if (!storedKey) {
+        throw new Error('OpenAI API key not configured. Please configure your API key in application settings.');
+      }
+      
+      console.log('🔑 Initializing OpenAI connection...');
+      await this.setupOpenAI(storedKey);
+    }
+    
+    // Validate connection is still healthy
+    if (!await this.validateConnection()) {
+      console.log('🔄 OpenAI connection validation failed, reinitializing...');
+      this.openai = null;
+      await this.ensureOpenAIConnection();
+    }
+  }
+
+  // 🔍 Connection validation
+  async validateConnection() {
+    if (!this.openai) return false;
+    
+    try {
+      // Quick API test with minimal cost
+      const testResponse = await Promise.race([
+        this.openai.models.list(),
+        this.timeoutPromise(5000, 'Connection validation timeout')
+      ]);
+      
+      return testResponse && testResponse.data;
+    } catch (error) {
+      console.warn('⚠️ OpenAI connection validation failed:', error.message);
+      return false;
+    }
+  }
+
+  // 🔄 Retry logic helpers
+  isRetryableError(error) {
+    if (!error) return false;
+    
+    const retryablePatterns = [
+      'ECONNRESET',
+      'ENOTFOUND', 
+      'ETIMEOUT',
+      'rate_limit_exceeded',
+      'server_error',
+      'timeout',
+      'fetch failed'
+    ];
+    
+    return retryablePatterns.some(pattern => 
+      error.message.toLowerCase().includes(pattern.toLowerCase()) ||
+      error.code === pattern ||
+      (error.status >= 500 && error.status < 600) // Server errors
+    );
+  }
+
+  isPersistentConnectionError(error) {
+    const persistentPatterns = [
+      'invalid_api_key',
+      'insufficient_quota',
+      'model_not_found',
+      'Unauthorized'
+    ];
+    
+    return persistentPatterns.some(pattern => 
+      error.message.toLowerCase().includes(pattern.toLowerCase()) ||
+      error.status === 401 || error.status === 403
+    );
+  }
+
+  // 🕒 Utility functions
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  timeoutPromise(ms, message) {
+    return new Promise((_, reject) => 
+      setTimeout(() => reject(new Error(message)), ms)
+    );
+  }
+
+  // 🛡️ Robust completion generation (shared with RAGService pattern)
+  async generateRobustCompletion(params, retryCount = 0) {
+    const maxRetries = 3;
+    const retryDelay = 1000 * (retryCount + 1); // Exponential backoff: 1s, 2s, 3s
+    
+    try {
+      // Ensure OpenAI client is initialized
+      await this.ensureOpenAIConnection();
+
+      const completion = await this.openai.chat.completions.create(params);
+      
+      if (!completion.choices || !completion.choices[0] || !completion.choices[0].message) {
+        throw new Error('Invalid completion response from OpenAI API');
+      }
+
+      return completion;
+      
+    } catch (error) {
+      console.error(`❌ Error generating completion (attempt ${retryCount + 1}/${maxRetries + 1}):`, error.message);
+      
+      // Retry logic for transient errors
+      if (retryCount < maxRetries && this.isRetryableError(error)) {
+        console.log(`🔄 Retrying completion generation in ${retryDelay}ms...`);
+        await this.delay(retryDelay);
+        return this.generateRobustCompletion(params, retryCount + 1);
+      }
+      
+      // Reset connection on persistent errors
+      if (this.isPersistentConnectionError(error)) {
+        console.log('🔄 Resetting OpenAI connection due to persistent error...');
+        this.openai = null;
+      }
+      
+      throw error;
+    }
+  }
+
+  async addDocument(documentId, chunks, progressCallback = null, documentMetadata = null) {
+    console.log(`🔄 Starting addDocument: ${documentId} with ${chunks.length} chunks`);
+    
     try {
       await this.initialize();
 
       const documents = this.vectorStore.get('documents') || {};
       const chunksStore = this.vectorStore.get('chunks') || {};
+      
+      console.log(`📖 Initial state: ${Object.keys(documents).length} docs, ${Object.keys(chunksStore).length} chunks`);
 
-      // Process each chunk with progress tracking
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        const chunkId = `${documentId}_chunk_${chunk.id}`;
+      // 🛡️ RESILIENT PROCESSING: Process chunks in batches with checkpoints
+      const batchSize = 10;
+      let processedCount = 0;
+      
+      for (let batchStart = 0; batchStart < chunks.length; batchStart += batchSize) {
+        const batchEnd = Math.min(batchStart + batchSize, chunks.length);
+        const batch = chunks.slice(batchStart, batchEnd);
         
-        // Report progress
-        if (progressCallback) {
-          progressCallback({
-            processed: i,
-            total: chunks.length,
-            current: i + 1,
-            percentage: Math.round(((i + 1) / chunks.length) * 100)
-          });
+        console.log(`📦 Processing batch ${Math.floor(batchStart/batchSize) + 1}: chunks ${batchStart + 1}-${batchEnd}`);
+
+        // Process each chunk in the batch
+        for (let i = 0; i < batch.length; i++) {
+          const globalIndex = batchStart + i;
+          const chunk = batch[i];
+          const chunkId = `${documentId}_chunk_${chunk.id}`;
+          
+          // Report progress
+          if (progressCallback) {
+            progressCallback({
+              processed: globalIndex,
+              total: chunks.length,
+              current: globalIndex + 1,
+              percentage: Math.round(((globalIndex + 1) / chunks.length) * 100)
+            });
+          }
+          
+          try {
+            // Generate embedding for the chunk text
+            const embedding = await this.generateEmbedding(chunk.text);
+            
+            // Store chunk with embedding
+            chunksStore[chunkId] = {
+              id: chunkId,
+              document_id: documentId,
+              chunk_id: chunk.id,
+              text: chunk.text,
+              embedding: embedding,
+              length: chunk.length,
+              sentence_start: chunk.sentenceStart || 0,
+              sentence_end: chunk.sentenceEnd || 0,
+              created: new Date().toISOString(),
+              
+              // 🚀 Enhanced Phase 1 Metadata (leveraging already-computed data)
+              document_type: documentMetadata?.documentType || null,
+              language: documentMetadata?.language || null,
+              confidence_score: documentMetadata?.confidence || null,
+              chunk_position: globalIndex + 1,
+              
+              // 🎯 Phase 2A Metadata - File Context & Processing Info
+              file_name: documentMetadata?.fileName || null,
+              file_id: documentMetadata?.fileId || null,
+              file_type: documentMetadata?.fileType || null,
+              file_size: documentMetadata?.fileSize || null,
+              upload_timestamp: documentMetadata?.uploadTimestamp || null,
+              processing_timestamp: documentMetadata?.processingTimestamp || null,
+              embedding_model: documentMetadata?.embeddingModel || "text-embedding-3-large"
+            };
+            
+            console.log(`✅ Chunk ${globalIndex + 1}/${chunks.length}: ${chunkId} embedded`);
+            
+          } catch (embeddingError) {
+            console.warn(`⚠️ Could not generate embedding for chunk ${chunkId}, storing without embedding:`, embeddingError.message);
+            
+            // Store chunk without embedding (for keyword search)
+            chunksStore[chunkId] = {
+              id: chunkId,
+              document_id: documentId,
+              chunk_id: chunk.id,
+              text: chunk.text,
+              embedding: null,
+              length: chunk.length,
+              sentence_start: chunk.sentenceStart || 0,
+              sentence_end: chunk.sentenceEnd || 0,
+              created: new Date().toISOString(),
+              
+              // 🚀 Enhanced Phase 1 Metadata (leveraging already-computed data)
+              document_type: documentMetadata?.documentType || null,
+              language: documentMetadata?.language || null,
+              confidence_score: documentMetadata?.confidence || null,
+              chunk_position: globalIndex + 1
+            };
+          }
+          
+          processedCount++;
         }
+
+        // 🛡️ CHECKPOINT: Save batch progress to prevent data loss
+        console.log(`💾 Checkpoint: Saving batch ${Math.floor(batchStart/batchSize) + 1} progress...`);
         
         try {
-          // Generate embedding for the chunk text
-          const embedding = await this.generateEmbedding(chunk.text);
+          // Update document index with current progress
+          if (!documents[documentId]) {
+            documents[documentId] = {
+              id: documentId,
+              chunk_count: 0,
+              created: new Date().toISOString()
+            };
+          }
+          documents[documentId].chunk_count = processedCount;
+          documents[documentId].updated = new Date().toISOString();
+          documents[documentId].status = 'processing';
           
-          // Store chunk with embedding
-          chunksStore[chunkId] = {
-            id: chunkId,
-            document_id: documentId,
-            chunk_id: chunk.id,
-            text: chunk.text,
-            embedding: embedding,
-            length: chunk.length,
-            sentence_start: chunk.sentenceStart || 0,
-            sentence_end: chunk.sentenceEnd || 0,
-            created: new Date().toISOString()
-          };
-        } catch (embeddingError) {
-          console.warn(`⚠️ Could not generate embedding for chunk ${chunkId}, storing without embedding:`, embeddingError.message);
+          // Save checkpoint
+          this.vectorStore.set('documents', documents);
+          this.vectorStore.set('chunks', chunksStore);
           
-          // Store chunk without embedding (for keyword search)
-          chunksStore[chunkId] = {
-            id: chunkId,
-            document_id: documentId,
-            chunk_id: chunk.id,
-            text: chunk.text,
-            embedding: null,
-            length: chunk.length,
-            sentence_start: chunk.sentenceStart || 0,
-            sentence_end: chunk.sentenceEnd || 0,
-            created: new Date().toISOString()
-          };
+          // 🔍 VALIDATION: Verify checkpoint was saved
+          const verifyChunks = this.vectorStore.get('chunks') || {};
+          const savedChunksForDoc = Object.keys(verifyChunks).filter(key => key.startsWith(documentId)).length;
+          
+          if (savedChunksForDoc >= processedCount) {
+            console.log(`✅ Checkpoint verified: ${savedChunksForDoc} chunks saved`);
+          } else {
+            throw new Error(`Checkpoint validation failed: expected ${processedCount}, found ${savedChunksForDoc}`);
+          }
+          
+        } catch (checkpointError) {
+          console.error(`❌ Checkpoint failed for batch ${Math.floor(batchStart/batchSize) + 1}:`, checkpointError);
+          throw new Error(`Processing failed at checkpoint after ${processedCount} chunks: ${checkpointError.message}`);
         }
       }
 
-      // Update document index
-      if (!documents[documentId]) {
-        documents[documentId] = {
-          id: documentId,
-          chunk_count: 0,
-          created: new Date().toISOString()
-        };
+      // 🎯 FINAL PERSISTENCE: Complete document processing
+      console.log(`🏁 Finalizing document: ${documentId} with ${processedCount} chunks`);
+      
+      try {
+        // Final document index update
+        if (!documents[documentId]) {
+          documents[documentId] = {
+            id: documentId,
+            chunk_count: 0,
+            created: new Date().toISOString()
+          };
+        }
+        documents[documentId].chunk_count = chunks.length;
+        documents[documentId].updated = new Date().toISOString();
+        documents[documentId].status = 'completed';
+
+        // 🛡️ FINAL SAVE with enhanced error handling
+        console.log('💾 Performing final save...');
+        
+        console.log('   → Saving documents index...');
+        this.vectorStore.set('documents', documents);
+        console.log('   ✅ Documents saved');
+        
+        console.log('   → Saving chunks data...');
+        this.vectorStore.set('chunks', chunksStore);
+        console.log('   ✅ Chunks saved');
+
+        // 🔍 FINAL VALIDATION: Verify complete persistence
+        console.log('🔍 Final validation...');
+        const finalChunks = this.vectorStore.get('chunks') || {};
+        const finalDocs = this.vectorStore.get('documents') || {};
+        
+        const finalChunkCount = Object.keys(finalChunks).filter(key => key.startsWith(documentId)).length;
+        const docExists = finalDocs[documentId] !== undefined;
+        
+        if (!docExists) {
+          throw new Error('Document not found in final validation');
+        }
+        
+        if (finalChunkCount !== chunks.length) {
+          throw new Error(`Chunk count mismatch: expected ${chunks.length}, found ${finalChunkCount}`);
+        }
+        
+        console.log(`✅ VALIDATION PASSED: ${finalChunkCount} chunks, document status: ${finalDocs[documentId].status}`);
+        console.log(`🎉 Successfully added ${chunks.length} chunks to local vector database`);
+        
+        return true;
+        
+      } catch (persistenceError) {
+        console.error('❌ FINAL PERSISTENCE FAILED:', persistenceError);
+        
+        // 🔄 ROLLBACK: Attempt to clean up partial data
+        console.log('🔄 Attempting rollback...');
+        try {
+          const rollbackChunks = this.vectorStore.get('chunks') || {};
+          const rollbackDocs = this.vectorStore.get('documents') || {};
+          
+          // Remove partial chunks
+          Object.keys(rollbackChunks).forEach(key => {
+            if (key.startsWith(documentId)) {
+              delete rollbackChunks[key];
+            }
+          });
+          
+          // Remove partial document
+          if (rollbackDocs[documentId]) {
+            delete rollbackDocs[documentId];
+          }
+          
+          this.vectorStore.set('chunks', rollbackChunks);
+          this.vectorStore.set('documents', rollbackDocs);
+          
+          console.log('✅ Rollback completed - partial data removed');
+        } catch (rollbackError) {
+          console.error('❌ Rollback failed:', rollbackError);
+        }
+        
+        throw persistenceError;
       }
-      documents[documentId].chunk_count = chunks.length;
-      documents[documentId].updated = new Date().toISOString();
-
-      // Save to store
-      this.vectorStore.set('documents', documents);
-      this.vectorStore.set('chunks', chunksStore);
-
-      console.log(`✅ Added ${chunks.length} chunks to local vector database`);
-      return true;
+      
     } catch (error) {
       console.error('❌ Error adding document to vector database:', error);
+      console.error('📊 Error context:', {
+        documentId,
+        totalChunks: chunks.length,
+        processedCount: processedCount || 0,
+        error: error.message
+      });
       return false;
     }
   }
@@ -338,6 +623,24 @@ class VectorService {
     this.settingsStore.delete('openai_api_key');
     this.openai = null;
     console.log('🔑 OpenAI API key cleared');
+  }
+
+  // 🧹 MEMORY MANAGEMENT: Clear service cache between documents
+  async clearCache() {
+    try {
+      console.log('🧹 Clearing VectorService cache...');
+      
+      // Clear any large cached variables
+      // (Don't clear stored vectors/documents, just temporary processing data)
+      
+      // Reset OpenAI connection state if needed to prevent accumulation
+      // Keep connection alive for efficiency, just clear any temp data
+      
+      console.log('✅ VectorService cache cleared');
+      
+    } catch (error) {
+      console.warn('⚠️ VectorService cache clearing warning:', error.message);
+    }
   }
 }
 

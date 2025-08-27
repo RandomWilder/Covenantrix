@@ -64,6 +64,127 @@ class RAGService {
     }
   }
 
+  // 🛡️ Robust completion generation with retry logic
+  async generateRobustCompletion(params, retryCount = 0) {
+    const maxRetries = 3;
+    const retryDelay = 1000 * (retryCount + 1); // Exponential backoff: 1s, 2s, 3s
+    
+    try {
+      // Ensure OpenAI client is initialized
+      await this.ensureOpenAIConnection();
+
+      const completion = await this.openai.chat.completions.create(params);
+      
+      if (!completion.choices || !completion.choices[0] || !completion.choices[0].message) {
+        throw new Error('Invalid completion response from OpenAI API');
+      }
+
+      return completion;
+      
+    } catch (error) {
+      console.error(`❌ Error generating completion (attempt ${retryCount + 1}/${maxRetries + 1}):`, error.message);
+      
+      // Retry logic for transient errors
+      if (retryCount < maxRetries && this.isRetryableError(error)) {
+        console.log(`🔄 Retrying completion generation in ${retryDelay}ms...`);
+        await this.delay(retryDelay);
+        return this.generateRobustCompletion(params, retryCount + 1);
+      }
+      
+      // Reset connection on persistent errors
+      if (this.isPersistentConnectionError(error)) {
+        console.log('🔄 Resetting OpenAI connection due to persistent error...');
+        this.openai = null;
+      }
+      
+      throw error;
+    }
+  }
+
+  // 🛡️ Robust connection management
+  async ensureOpenAIConnection() {
+    if (!this.openai) {
+      const storedKey = this.settingsStore.get('openai_api_key');
+      if (!storedKey) {
+        throw new Error('OpenAI API key not configured. Please configure your API key in application settings.');
+      }
+      
+      console.log('🔑 Initializing RAG OpenAI connection...');
+      await this.setupOpenAI(storedKey);
+    }
+    
+    // Validate connection is still healthy
+    if (!await this.validateConnection()) {
+      console.log('🔄 RAG OpenAI connection validation failed, reinitializing...');
+      this.openai = null;
+      await this.ensureOpenAIConnection();
+    }
+  }
+
+  // 🔍 Connection validation
+  async validateConnection() {
+    if (!this.openai) return false;
+    
+    try {
+      // Quick API test with minimal cost
+      const testResponse = await Promise.race([
+        this.openai.models.list(),
+        this.timeoutPromise(5000, 'Connection validation timeout')
+      ]);
+      
+      return testResponse && testResponse.data;
+    } catch (error) {
+      console.warn('⚠️ RAG OpenAI connection validation failed:', error.message);
+      return false;
+    }
+  }
+
+  // 🔄 Retry logic helpers
+  isRetryableError(error) {
+    if (!error) return false;
+    
+    const retryablePatterns = [
+      'ECONNRESET',
+      'ENOTFOUND', 
+      'ETIMEOUT',
+      'rate_limit_exceeded',
+      'server_error',
+      'timeout',
+      'fetch failed'
+    ];
+    
+    return retryablePatterns.some(pattern => 
+      error.message.toLowerCase().includes(pattern.toLowerCase()) ||
+      error.code === pattern ||
+      (error.status >= 500 && error.status < 600) // Server errors
+    );
+  }
+
+  isPersistentConnectionError(error) {
+    const persistentPatterns = [
+      'invalid_api_key',
+      'insufficient_quota',
+      'model_not_found',
+      'Unauthorized'
+    ];
+    
+    return persistentPatterns.some(pattern => 
+      error.message.toLowerCase().includes(pattern.toLowerCase()) ||
+      error.status === 401 || error.status === 403
+    );
+  }
+
+  // 🕒 Utility functions
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  timeoutPromise(ms, message) {
+    return new Promise((_, reject) => 
+      setTimeout(() => reject(new Error(message)), ms)
+    );
+  }
+
   // Generate optimized contract-aware prompts based on query type and current persona
   generatePrompt(query, context, queryType = 'general') {
     // Use PersonaService to generate persona-specific prompt
@@ -819,8 +940,8 @@ Analysis:`;
         }
       }
 
-      // Step 10: Generate LLM response
-      const completion = await this.openai.chat.completions.create({
+      // Step 10: Generate LLM response with robust connection management
+      const completion = await this.generateRobustCompletion({
         model: 'gpt-4',
         messages: messages,
         temperature: 0.3, // Lower temperature for more factual responses

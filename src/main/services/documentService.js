@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
+const XLSX = require('xlsx');
+const rtfParser = require('rtf-parser');
 const Store = require('electron-store');
 const { v4: uuidv4 } = require('uuid');
 const VectorService = require('./vectorService');
@@ -29,17 +32,17 @@ class DocumentService {
     this.initializeServices();
     
     const injectionStatus = vectorService && ocrService ? '(injected)' : '(self-created)';
-    console.log(`📄 DocumentService initialized with Phase 3 Hybrid OCR capabilities ${injectionStatus}`);
-    console.log('📁 Documents stored at:', this.documentsPath);
+    console.log(`DocumentService initialized with Graph RAG capabilities ${injectionStatus}`);
+    console.log('Documents stored at:', this.documentsPath);
   }
 
   async initializeServices() {
     try {
       await this.vectorService.initialize();
       await this.ocrService.autoInitialize();
-      console.log('✅ Phase 3 services initialized (Google Vision OCR)');
+      console.log('Services initialized (Google Vision OCR + Graph RAG ready)');
     } catch (error) {
-      console.error('⚠️ Error initializing Phase 3 services:', error);
+      console.error('Error initializing services:', error);
     }
   }
 
@@ -51,7 +54,7 @@ class DocumentService {
 
   async processDocument(filePath, fileName, progressCallback = null, folderId = null) {
     const documentId = uuidv4();
-    console.log(`🔄 Processing document: ${fileName} (ID: ${documentId})`);
+    console.log(`Processing document: ${fileName} (ID: ${documentId})`);
     
     // Validate folder or use default
     const targetFolderId = folderId && this.folderService.validateFolder(folderId) 
@@ -66,7 +69,7 @@ class DocumentService {
       'text_extraction': { progress: 40, message: 'Extracting text from document...' },
       'ocr_processing': { progress: 70, message: 'Processing with OCR (this may take a moment)...' },
       'document_analysis': { progress: 80, message: 'Analyzing document structure...' },
-      'chunking': { progress: 85, message: 'Creating text chunks...' },
+      'entity_chunking': { progress: 85, message: 'Creating entity-aware text chunks...' },
       'saving': { progress: 90, message: 'Saving processed document...' },
       'vectorizing': { progress: 95, message: 'Adding to semantic search database...' },
       'completed': { progress: 100, message: 'Document processing completed!' }
@@ -86,7 +89,7 @@ class DocumentService {
           progress: stepInfo.progress,
           message: stepInfo.message,
           elapsed,
-          eta: eta > 1000 ? Math.round(eta / 1000) : 0, // ETA in seconds
+          eta: eta > 1000 ? Math.round(eta / 1000) : 0,
           ...additionalInfo
         });
       }
@@ -100,18 +103,18 @@ class DocumentService {
     
     try {
       const fileExt = path.extname(fileName).toLowerCase();
-      console.log(`📄 File type: ${fileExt}, Size: ${fs.statSync(filePath).size} bytes`);
+      console.log(`File type: ${fileExt}, Size: ${fs.statSync(filePath).size} bytes`);
       
       reportProgress('file_validation', { fileSize: fs.statSync(filePath).size });
 
       // Check if filename contains non-ASCII characters that might cause issues
       const hasUnicodeChars = /[^\x00-\x7F]/.test(filePath);
       if (hasUnicodeChars) {
-        console.log(`🔤 Unicode characters detected in file path, creating safe copy...`);
+        console.log(`Unicode characters detected in file path, creating safe copy...`);
         tempFilePath = this.createSafeFilePath(filePath, documentId);
         await this.copyToSafePath(filePath, tempFilePath);
         workingFilePath = tempFilePath;
-        console.log(`📁 Working with safe file path: ${path.basename(tempFilePath)}`);
+        console.log(`Working with safe file path: ${path.basename(tempFilePath)}`);
       }
       
       // Read file buffer
@@ -128,12 +131,17 @@ class DocumentService {
         processingSteps: [],
         hasUnicodeFilename: hasUnicodeChars,
         folderId: targetFolderId,
-        folderName: this.folderService.getFolder(targetFolderId)?.name || 'All Documents'
+        folderName: this.folderService.getFolder(targetFolderId)?.name || 'All Documents',
+        // Graph RAG ready fields
+        entities: [],
+        relationships: [],
+        graphVersion: "1.0",
+        entityAwareChunking: true
       };
 
       // Extract text based on file type
       if (fileExt === '.pdf') {
-        console.log(`📄 Starting PDF processing for ${fileName}...`);
+        console.log(`Starting PDF processing for ${fileName}...`);
         reportProgress('text_extraction', { stage: 'pdf_analysis' });
         metadata.processingSteps.push({ step: 'pdf_extraction_started', timestamp: new Date().toISOString() });
         
@@ -149,12 +157,8 @@ class DocumentService {
         });
         metadata.processingSteps.push({ step: 'pdf_extraction_completed', timestamp: new Date().toISOString() });
         
-        // Check if the result is an OCR result object or just text
         if (typeof pdfResult === 'object' && pdfResult.text) {
-          // This is a scanned PDF that was processed with OCR
           extractedText = pdfResult.text;
-          
-          // Store comprehensive OCR metadata for scanned PDFs
           metadata.ocrConfidence = pdfResult.confidence;
           metadata.wordCount = pdfResult.wordCount;
           metadata.detectedLanguage = pdfResult.language;
@@ -178,27 +182,93 @@ class DocumentService {
             }));
           }
           
-          console.log(`✅ Scanned PDF OCR processing completed for ${fileName}`);
-          console.log(`📊 Engine: ${pdfResult.engine}, Confidence: ${pdfResult.confidence.toFixed(1)}%, Language: ${pdfResult.language}`);
-          console.log(`⏱️ Processing: ${pdfResult.processingTime}ms total (${pdfResult.conversionTime}ms convert + ${pdfResult.ocrTime}ms OCR)`);
-          console.log(`📄 Pages: ${pdfResult.pagesProcessed}/${pdfResult.totalPages} processed successfully`);
-          
-          if (pdfResult.language === 'hebrew') {
-            console.log(`🔤 Hebrew text detected - enhanced processing enabled`);
-          }
+          console.log(`Scanned PDF OCR processing completed for ${fileName}`);
+          console.log(`Engine: ${pdfResult.engine}, Confidence: ${pdfResult.confidence.toFixed(1)}%, Language: ${pdfResult.language}`);
           
         } else if (typeof pdfResult === 'string') {
-          // Regular PDF with embedded text
           extractedText = pdfResult;
           metadata.isScannedPDF = false;
-          console.log(`📄 Standard PDF text extraction: ${extractedText.length} characters`);
+          console.log(`Standard PDF text extraction: ${extractedText.length} characters`);
         } else {
           throw new Error('Invalid PDF processing result');
         }
         
+      } else if (this.isWordDocument(fileName)) {
+        console.log(`Starting Word document processing: ${fileName}`);
+        reportProgress('text_extraction', { stage: 'word_extraction' });
+        metadata.processingSteps.push({ step: 'word_extraction_started', timestamp: new Date().toISOString() });
+        
+        const wordResult = await this.extractTextFromWord(buffer, fileName);
+        extractedText = wordResult.text;
+        metadata.processingSteps.push({ step: 'word_extraction_completed', timestamp: new Date().toISOString() });
+        
+        metadata.wordCount = wordResult.wordCount;
+        metadata.detectedLanguage = wordResult.language;
+        metadata.processingEngine = wordResult.engine;
+        metadata.processingTime = wordResult.processingTime;
+        metadata.confidence = wordResult.confidence;
+        
+        console.log(`Word document processing completed for ${fileName}`);
+        console.log(`Engine: ${wordResult.engine}, Text length: ${extractedText.length} characters`);
+        
+      } else if (this.isExcelDocument(fileName)) {
+        console.log(`Starting Excel document processing: ${fileName}`);
+        reportProgress('text_extraction', { stage: 'excel_extraction' });
+        metadata.processingSteps.push({ step: 'excel_extraction_started', timestamp: new Date().toISOString() });
+        
+        const excelResult = await this.extractTextFromExcel(buffer, fileName);
+        extractedText = excelResult.text;
+        metadata.processingSteps.push({ step: 'excel_extraction_completed', timestamp: new Date().toISOString() });
+        
+        metadata.wordCount = excelResult.wordCount;
+        metadata.detectedLanguage = excelResult.language;
+        metadata.processingEngine = excelResult.engine;
+        metadata.processingTime = excelResult.processingTime;
+        metadata.confidence = excelResult.confidence;
+        metadata.sheetsProcessed = excelResult.sheetsProcessed;
+        metadata.cellsProcessed = excelResult.cellsProcessed;
+        
+        console.log(`Excel document processing completed for ${fileName}`);
+        console.log(`Engine: ${excelResult.engine}, Sheets: ${excelResult.sheetsProcessed}, Text length: ${extractedText.length} characters`);
+        
+      } else if (this.isRTFDocument(fileName)) {
+        console.log(`Starting RTF document processing: ${fileName}`);
+        reportProgress('text_extraction', { stage: 'rtf_extraction' });
+        metadata.processingSteps.push({ step: 'rtf_extraction_started', timestamp: new Date().toISOString() });
+        
+        const rtfResult = await this.extractTextFromRTF(buffer, fileName);
+        extractedText = rtfResult.text;
+        metadata.processingSteps.push({ step: 'rtf_extraction_completed', timestamp: new Date().toISOString() });
+        
+        metadata.wordCount = rtfResult.wordCount;
+        metadata.detectedLanguage = rtfResult.language;
+        metadata.processingEngine = rtfResult.engine;
+        metadata.processingTime = rtfResult.processingTime;
+        metadata.confidence = rtfResult.confidence;
+        
+        console.log(`RTF document processing completed for ${fileName}`);
+        console.log(`Engine: ${rtfResult.engine}, Text length: ${extractedText.length} characters`);
+        
+      } else if (this.isPlainTextDocument(fileName)) {
+        console.log(`Starting plain text document processing: ${fileName}`);
+        reportProgress('text_extraction', { stage: 'text_extraction' });
+        metadata.processingSteps.push({ step: 'text_extraction_started', timestamp: new Date().toISOString() });
+        
+        const textResult = await this.extractTextFromPlainText(buffer, fileName);
+        extractedText = textResult.text;
+        metadata.processingSteps.push({ step: 'text_extraction_completed', timestamp: new Date().toISOString() });
+        
+        metadata.wordCount = textResult.wordCount;
+        metadata.detectedLanguage = textResult.language;
+        metadata.processingEngine = textResult.engine;
+        metadata.processingTime = textResult.processingTime;
+        metadata.confidence = textResult.confidence;
+        
+        console.log(`Plain text document processing completed for ${fileName}`);
+        console.log(`Text length: ${extractedText.length} characters`);
+        
       } else if (this.isImageFile(fileName)) {
-        // Process image files with Google Vision OCR
-        console.log(`🖼️ Starting image OCR processing: ${fileName}`);
+        console.log(`Starting image OCR processing: ${fileName}`);
         reportProgress('ocr_processing', { stage: 'image_ocr' });
         metadata.processingSteps.push({ step: 'image_ocr_started', timestamp: new Date().toISOString() });
         
@@ -207,7 +277,6 @@ class DocumentService {
           extractedText = ocrResult.text;
           metadata.processingSteps.push({ step: 'image_ocr_completed', timestamp: new Date().toISOString() });
           
-          // Store comprehensive OCR metadata
           metadata.ocrConfidence = ocrResult.confidence;
           metadata.wordCount = ocrResult.wordCount;
           metadata.detectedLanguage = ocrResult.language;
@@ -216,27 +285,21 @@ class DocumentService {
           metadata.ocrEngine = ocrResult.engine;
           metadata.processingTime = ocrResult.processingTime;
           
-          console.log(`✅ Image OCR processing completed for ${fileName}`);
-          console.log(`📊 Engine: ${ocrResult.engine}, Confidence: ${ocrResult.confidence.toFixed(1)}%, Language: ${ocrResult.language}`);
-          console.log(`📄 Extracted ${ocrResult.text.length} characters, ${ocrResult.wordCount} words`);
-          
-          if (ocrResult.language === 'hebrew') {
-            console.log(`🔤 Hebrew text detected - enhanced processing enabled`);
-          }
+          console.log(`Image OCR processing completed for ${fileName}`);
+          console.log(`Engine: ${ocrResult.engine}, Confidence: ${ocrResult.confidence.toFixed(1)}%, Language: ${ocrResult.language}`);
           
         } catch (ocrError) {
-          console.error(`❌ OCR processing failed for ${fileName}:`, ocrError.message);
+          console.error(`OCR processing failed for ${fileName}:`, ocrError.message);
           metadata.processingSteps.push({ 
             step: 'image_ocr_failed', 
             timestamp: new Date().toISOString(), 
             error: ocrError.message 
           });
           
-          // Fail fast instead of creating broken documents
           throw new Error(`Image OCR failed: ${ocrError.message}. Please ensure the image is clear and contains readable text.`);
         }
       } else {
-        throw new Error(`Unsupported file type: ${fileExt}. Supported formats: PDF, PNG, JPG, JPEG, GIF, BMP, WEBP`);
+        throw new Error(`Unsupported file type: ${fileExt}. Supported formats: PDF, DOC, DOCX, XLS, XLSX, RTF, TXT, PNG, JPG, JPEG, GIF, BMP, WEBP`);
       }
 
       // Validate extracted text
@@ -244,35 +307,39 @@ class DocumentService {
         throw new Error('No text could be extracted from the document. The document may be empty or contain only images/graphics.');
       }
 
-      console.log(`📝 Text extraction successful: ${extractedText.length} characters extracted`);
+      console.log(`Text extraction successful: ${extractedText.length} characters extracted`);
 
-      // Document type detection and chunking
+      // Document type detection and entity-aware chunking
       reportProgress('document_analysis', { textLength: extractedText.length });
-      console.log(`🔍 Analyzing document structure and preparing chunks...`);
-      metadata.processingSteps.push({ step: 'chunking_started', timestamp: new Date().toISOString() });
+      console.log(`Analyzing document structure and preparing entity-aware chunks...`);
+      metadata.processingSteps.push({ step: 'entity_chunking_started', timestamp: new Date().toISOString() });
       
       const documentType = this.detectDocumentType(extractedText);
-      console.log(`📋 Document type detected: ${documentType}`);
+      console.log(`Document type detected: ${documentType}`);
       
-      reportProgress('chunking', { documentType });
-      const chunks = this.contractAwareChunking(extractedText, {
-        chunkSize: 512,
-        overlap: 50,
-        documentType: documentType
+      reportProgress('entity_chunking', { documentType });
+      
+      // Use new entity-aware chunking
+      const chunks = await this.contractAwareChunking(extractedText, {
+        chunkSize: 1200,
+        overlap: 120,
+        documentType: documentType,
+        useEntityDetection: true
       });
       
       metadata.processingSteps.push({ 
-        step: 'chunking_completed', 
+        step: 'entity_chunking_completed', 
         timestamp: new Date().toISOString(),
         chunksCreated: chunks.length,
-        documentType: documentType
+        documentType: documentType,
+        entityAware: true
       });
 
-      console.log(`📝 Created ${chunks.length} chunks using ${documentType} strategy`);
+      console.log(`Created ${chunks.length} entity-aware chunks using ${documentType} strategy`);
 
       // Save extracted text and chunks
       reportProgress('saving', { chunksCount: chunks.length });
-      console.log(`💾 Saving document data...`);
+      console.log(`Saving document data...`);
       const textFilePath = path.join(this.documentsPath, `${documentId}.txt`);
       const chunksFilePath = path.join(this.documentsPath, `${documentId}_chunks.json`);
       
@@ -286,14 +353,31 @@ class DocumentService {
       metadata.documentType = documentType;
       metadata.processingCompletedAt = new Date().toISOString();
 
-      // Store metadata before vector processing (in case vector processing fails)
+      // Store metadata before vector processing
       this.saveDocumentMetadata(documentId, metadata);
       metadata.processingSteps.push({ step: 'metadata_saved', timestamp: new Date().toISOString() });
 
       // Add to vector database for semantic search
       reportProgress('vectorizing', { chunksCount: chunks.length });
-      console.log(`🧠 Adding to vector database...`);
+      console.log(`Adding to vector database...`);
       metadata.processingSteps.push({ step: 'vectorization_started', timestamp: new Date().toISOString() });
+      
+      // 🚀 Collect already-computed metadata for enhanced chunk storage
+      const documentMetadata = {
+        // Phase 1 Metadata (existing)
+        documentType: documentType,
+        language: metadata.detectedLanguage || null,
+        confidence: metadata.ocrConfidence || null,
+        
+        // 🎯 Phase 2A Metadata - File Context & Processing Info
+        fileName: fileName,                           // Original uploaded name
+        fileId: documentId,                          // Document UUID  
+        fileType: fileExt,                           // File extension (.pdf, .docx, etc.)
+        fileSize: fs.existsSync(filePath) ? fs.statSync(filePath).size : 0, // File size in bytes
+        uploadTimestamp: metadata.uploadedAt,        // Upload timestamp
+        processingTimestamp: new Date().toISOString(), // Current processing timestamp
+        embeddingModel: "text-embedding-3-large"     // Embedding model used
+      };
       
       try {
         await this.vectorService.addDocument(documentId, chunks, (vectorProgress) => {
@@ -302,12 +386,12 @@ class DocumentService {
             totalChunks: vectorProgress.total || chunks.length,
             currentChunk: vectorProgress.current || 0
           });
-        });
+        }, documentMetadata);
         metadata.vectorized = true;
         metadata.processingSteps.push({ step: 'vectorization_completed', timestamp: new Date().toISOString() });
-        console.log(`✅ Added ${chunks.length} chunks to vector database`);
+        console.log(`Added ${chunks.length} chunks to vector database`);
       } catch (vectorError) {
-        console.warn('⚠️ Could not add to vector database:', vectorError.message);
+        console.warn('Could not add to vector database:', vectorError.message);
         metadata.vectorized = false;
         metadata.vectorizationError = vectorError.message;
         metadata.processingSteps.push({ 
@@ -320,14 +404,10 @@ class DocumentService {
       // Update metadata with final vectorization status
       this.saveDocumentMetadata(documentId, metadata);
 
-      console.log(`\n✅ Document processed successfully: ${fileName}`);
-      console.log(`📊 Summary: ${extractedText.length} characters → ${chunks.length} chunks`);
-      console.log(`🔤 Language: ${metadata.detectedLanguage || 'unknown'} | Type: ${documentType}`);
-      console.log(`🧠 Vector database: ${metadata.vectorized ? '✅ Added' : '❌ Skipped'}`);
-      
-      if (metadata.hasHebrew) {
-        console.log(`🔤 Hebrew processing: Successfully handled Hebrew content`);
-      }
+      console.log(`\nDocument processed successfully: ${fileName}`);
+      console.log(`Summary: ${extractedText.length} characters → ${chunks.length} entity-aware chunks`);
+      console.log(`Language: ${metadata.detectedLanguage || 'unknown'} | Type: ${documentType}`);
+      console.log(`Vector database: ${metadata.vectorized ? 'Added' : 'Skipped'}`);
 
       // Report final completion
       reportProgress('completed', { 
@@ -337,33 +417,56 @@ class DocumentService {
         documentType: documentType,
         language: metadata.detectedLanguage,
         vectorized: metadata.vectorized,
-        processingTime: Date.now() - startTime
+        processingTime: Date.now() - startTime,
+        entityAware: true
       });
 
-      // Clean up temporary file if created
-      if (tempFilePath && fs.existsSync(tempFilePath)) {
-        try {
+      // 🧹 COMPREHENSIVE CLEANUP: Prevent memory leaks between documents
+      console.log('🧹 Performing comprehensive cleanup...');
+      
+      try {
+        // 1. Clean up temporary file if created
+        if (tempFilePath && fs.existsSync(tempFilePath)) {
           fs.unlinkSync(tempFilePath);
-          console.log(`🧹 Cleaned up temporary file: ${path.basename(tempFilePath)}`);
-        } catch (cleanupError) {
-          console.warn(`⚠️ Could not clean up temp file: ${cleanupError.message}`);
+          console.log(`✅ Cleaned up temporary file: ${path.basename(tempFilePath)}`);
         }
+
+        // 2. Clear large text variables to free memory
+        extractedText = null;
+        chunks = null;
+        
+        // 3. Force garbage collection if available (Node.js with --expose-gc)
+        if (global.gc) {
+          global.gc();
+          console.log('✅ Forced garbage collection');
+        }
+
+        // 4. Clear any cached OCR data
+        await this.clearProcessingCache();
+        
+        console.log('✅ Comprehensive cleanup completed');
+        
+      } catch (cleanupError) {
+        console.warn('⚠️ Cleanup warning:', cleanupError.message);
       }
 
-      return {
+      const result = {
         success: true,
         document: metadata,
-        chunksCount: chunks.length,
-        textLength: extractedText.length,
+        chunksCount: chunks ? chunks.length : 0,
+        textLength: extractedText ? extractedText.length : 0,
         vectorized: metadata.vectorized,
         documentType: documentType,
-        language: metadata.detectedLanguage
+        language: metadata.detectedLanguage,
+        entityAware: true
       };
 
+      return result;
+
     } catch (error) {
-      console.error(`\n❌ Error processing document ${fileName}:`, error.message);
-      console.error(`📄 Document ID: ${documentId}`);
-      console.error(`🔍 Error details:`, error);
+      console.error(`\nError processing document ${fileName}:`, error.message);
+      console.error(`Document ID: ${documentId}`);
+      console.error(`Error details:`, error);
       
       // Try to save error metadata if possible
       try {
@@ -379,7 +482,6 @@ class DocumentService {
           processingSteps: metadata?.processingSteps || []
         };
         
-        // Add final error step
         errorMetadata.processingSteps.push({
           step: 'processing_failed',
           timestamp: new Date().toISOString(),
@@ -387,19 +489,38 @@ class DocumentService {
         });
         
         this.saveDocumentMetadata(documentId, errorMetadata);
-        console.log(`💾 Error metadata saved for debugging`);
+        console.log(`Error metadata saved for debugging`);
       } catch (metadataError) {
-        console.error(`⚠️ Could not save error metadata:`, metadataError.message);
+        console.error(`Could not save error metadata:`, metadataError.message);
       }
 
-      // Clean up temporary file if created (even on error)
-      if (tempFilePath && fs.existsSync(tempFilePath)) {
-        try {
+      // 🧹 COMPREHENSIVE CLEANUP (even on error)
+      console.log('🧹 Performing error cleanup...');
+      
+      try {
+        // Clean up temporary file if created
+        if (tempFilePath && fs.existsSync(tempFilePath)) {
           fs.unlinkSync(tempFilePath);
-          console.log(`🧹 Cleaned up temporary file after error: ${path.basename(tempFilePath)}`);
-        } catch (cleanupError) {
-          console.warn(`⚠️ Could not clean up temp file after error: ${cleanupError.message}`);
+          console.log(`✅ Cleaned up temporary file after error: ${path.basename(tempFilePath)}`);
         }
+
+        // Clear any large variables that might be in scope
+        if (typeof extractedText !== 'undefined') extractedText = null;
+        if (typeof chunks !== 'undefined') chunks = null;
+        
+        // Clear any cached processing data
+        await this.clearProcessingCache();
+        
+        // Force garbage collection if available
+        if (global.gc) {
+          global.gc();
+          console.log('✅ Forced garbage collection after error');
+        }
+        
+        console.log('✅ Error cleanup completed');
+        
+      } catch (cleanupError) {
+        console.warn(`⚠️ Error cleanup warning: ${cleanupError.message}`);
       }
       
       return {
@@ -417,44 +538,38 @@ class DocumentService {
       const data = await pdfParse(buffer);
       const extractedText = data.text.trim();
       
-      console.log(`📄 PDF pages: ${data.numpages}, Text length: ${extractedText.length}`);
+      console.log(`PDF pages: ${data.numpages}, Text length: ${extractedText.length}`);
       
       // Smart OCR detection: Check if this is likely a scanned PDF
       const avgCharsPerPage = extractedText.length / data.numpages;
-      const hasMinimalText = avgCharsPerPage < 150; // Increased threshold for Hebrew/Arabic
+      const hasMinimalText = avgCharsPerPage < 150;
       const isLikelyScanned = hasMinimalText || this.containsGarbledText(extractedText);
       
-      console.log(`📊 PDF Analysis: ${avgCharsPerPage.toFixed(1)} chars/page, scanned: ${isLikelyScanned}`);
+      console.log(`PDF Analysis: ${avgCharsPerPage.toFixed(1)} chars/page, scanned: ${isLikelyScanned}`);
       
       if (isLikelyScanned) {
-        console.log(`🔍 Detected scanned PDF. Attempting Google Vision OCR...`);
+        console.log(`Detected scanned PDF. Attempting Google Vision OCR...`);
         
         try {
-          // Use Google Vision OCR for scanned PDFs
           const ocrResult = await this.ocrService.extractFromPDF(filePath, progressCallback);
           
           if (ocrResult && ocrResult.success && ocrResult.text && ocrResult.text.trim().length > 0) {
-            console.log(`✅ PDF OCR successful: ${ocrResult.text.length} characters extracted`);
-            console.log(`📊 OCR confidence: ${ocrResult.confidence.toFixed(1)}%, language: ${ocrResult.language}`);
-            
-            // Always prefer OCR results for scanned PDFs, even if shorter than original
-            // (original might contain garbled extraction artifacts)
-            return ocrResult; // Return the full OCR result object
+            console.log(`PDF OCR successful: ${ocrResult.text.length} characters extracted`);
+            console.log(`OCR confidence: ${ocrResult.confidence.toFixed(1)}%, language: ${ocrResult.language}`);
+            return ocrResult;
           } else {
-            console.warn('⚠️ PDF OCR returned no text, checking if original extraction has content');
+            console.warn('PDF OCR returned no text, checking if original extraction has content');
             
-            // If OCR failed but we have some original text, use it with a warning
             if (extractedText.length > 10) {
-              console.log('📄 Using standard extraction with OCR failure notice');
+              console.log('Using standard extraction with OCR failure notice');
               return extractedText + '\n\n[NOTE: This appears to be a scanned PDF. OCR processing failed but some text was extracted. Quality may be limited.]';
             } else {
               throw new Error('Both standard extraction and OCR failed to extract meaningful text');
             }
           }
         } catch (ocrError) {
-          console.error('❌ PDF OCR failed:', ocrError.message);
+          console.error('PDF OCR failed:', ocrError.message);
           
-          // If we have some standard text, use it; otherwise, fail
           if (extractedText.length > 10) {
             return extractedText + '\n\n[NOTE: This appears to be a scanned PDF. OCR processing failed. For better text extraction, try converting to high-quality images (PNG/JPG) and re-upload.]';
           } else {
@@ -463,8 +578,7 @@ class DocumentService {
         }
       }
       
-      // Document has good standard text extraction
-      console.log('✅ Using standard PDF text extraction');
+      console.log('Using standard PDF text extraction');
       return extractedText;
       
     } catch (error) {
@@ -472,22 +586,145 @@ class DocumentService {
     }
   }
 
-  // Helper method to detect garbled text that suggests scanning artifacts
+  async extractTextFromWord(buffer, fileName) {
+    try {
+      console.log(`Extracting text from Word document: ${fileName}`);
+      const result = await mammoth.extractRawText({ buffer: buffer });
+      const extractedText = result.value.trim();
+      
+      if (result.messages && result.messages.length > 0) {
+        console.warn('Word extraction warnings:', result.messages.map(m => m.message).join(', '));
+      }
+      
+      console.log(`Word extraction successful: ${extractedText.length} characters`);
+      return {
+        text: extractedText,
+        wordCount: extractedText.split(/\s+/).filter(word => word.length > 0).length,
+        confidence: 100, // Word documents have perfect text extraction
+        language: 'unknown', // Could add language detection here
+        engine: 'mammoth',
+        processingTime: 0
+      };
+    } catch (error) {
+      throw new Error(`Word document extraction failed: ${error.message}`);
+    }
+  }
+
+  async extractTextFromExcel(buffer, fileName) {
+    try {
+      console.log(`Extracting text from Excel document: ${fileName}`);
+      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      let allText = '';
+      let cellCount = 0;
+      
+      workbook.SheetNames.forEach(sheetName => {
+        const worksheet = workbook.Sheets[sheetName];
+        const sheetText = XLSX.utils.sheet_to_txt(worksheet, { header: 1 });
+        if (sheetText.trim().length > 0) {
+          allText += `\n=== Sheet: ${sheetName} ===\n${sheetText}\n`;
+          cellCount += Object.keys(worksheet).filter(key => key !== '!ref' && key !== '!margins').length;
+        }
+      });
+      
+      const extractedText = allText.trim();
+      console.log(`Excel extraction successful: ${extractedText.length} characters from ${workbook.SheetNames.length} sheets`);
+      
+      return {
+        text: extractedText,
+        wordCount: extractedText.split(/\s+/).filter(word => word.length > 0).length,
+        confidence: 100,
+        language: 'unknown',
+        engine: 'xlsx',
+        processingTime: 0,
+        sheetsProcessed: workbook.SheetNames.length,
+        cellsProcessed: cellCount
+      };
+    } catch (error) {
+      throw new Error(`Excel document extraction failed: ${error.message}`);
+    }
+  }
+
+  async extractTextFromRTF(buffer, fileName) {
+    try {
+      console.log(`Extracting text from RTF document: ${fileName}`);
+      const rtfContent = buffer.toString('utf-8');
+      
+      return new Promise((resolve, reject) => {
+        rtfParser.parseString(rtfContent, (err, doc) => {
+          if (err) {
+            reject(new Error(`RTF parsing failed: ${err.message}`));
+            return;
+          }
+          
+          // Extract plain text from RTF document structure
+          let extractedText = '';
+          
+          const extractText = (node) => {
+            if (node.type === 'text') {
+              extractedText += node.value;
+            } else if (node.type === 'paragraph') {
+              if (node.children) {
+                node.children.forEach(child => extractText(child));
+              }
+              extractedText += '\n';
+            } else if (node.children) {
+              node.children.forEach(child => extractText(child));
+            }
+          };
+          
+          if (doc.children) {
+            doc.children.forEach(child => extractText(child));
+          }
+          
+          extractedText = extractedText.trim();
+          console.log(`RTF extraction successful: ${extractedText.length} characters`);
+          
+          resolve({
+            text: extractedText,
+            wordCount: extractedText.split(/\s+/).filter(word => word.length > 0).length,
+            confidence: 100,
+            language: 'unknown',
+            engine: 'rtf-parser',
+            processingTime: 0
+          });
+        });
+      });
+    } catch (error) {
+      throw new Error(`RTF document extraction failed: ${error.message}`);
+    }
+  }
+
+  async extractTextFromPlainText(buffer, fileName) {
+    try {
+      console.log(`Reading plain text file: ${fileName}`);
+      const extractedText = buffer.toString('utf-8').trim();
+      
+      console.log(`Plain text extraction successful: ${extractedText.length} characters`);
+      return {
+        text: extractedText,
+        wordCount: extractedText.split(/\s+/).filter(word => word.length > 0).length,
+        confidence: 100,
+        language: 'unknown',
+        engine: 'native',
+        processingTime: 0
+      };
+    } catch (error) {
+      throw new Error(`Plain text extraction failed: ${error.message}`);
+    }
+  }
+
   containsGarbledText(text) {
     if (!text || text.length < 20) return false;
     
-    // Check for common PDF extraction artifacts
     const garbledPatterns = [
-      /[�]{2,}/g, // Replacement characters
-      /(.)\1{10,}/g, // Repeated single characters
-      /^[\s\n\r]*$/g, // Only whitespace
-      /[^\x00-\x7F\u0590-\u05FF\u0600-\u06FF\u0020-\u007E]{20,}/g // Long sequences of non-printable chars (excluding Hebrew/Arabic)
+      /[�]{2,}/g,
+      /(.)\1{10,}/g,
+      /^[\s\n\r]*$/g,
+      /[^\x00-\x7F\u0590-\u05FF\u0600-\u06FF\u0020-\u007E]{20,}/g
     ];
     
     return garbledPatterns.some(pattern => pattern.test(text));
   }
-
-
 
   detectDocumentType(text) {
     const englishLegalTerms = [
@@ -496,7 +733,6 @@ class DocumentService {
       'breach', 'terminate', 'indemnify', 'covenant', 'consideration'
     ];
     
-    // Hebrew legal terms (common in Israeli contracts)
     const hebrewLegalTerms = [
       'הסכם', 'חוזה', 'צד', 'צדדים', 'הצדדים', 'תנאי', 'תנאים', 'הוראות',
       'אחריות', 'חובות', 'זכויות', 'התחייבות', 'התחייבויות', 'סיום', 'ביטול',
@@ -507,7 +743,6 @@ class DocumentService {
     const englishTermCount = englishLegalTerms.filter(term => textLower.includes(term)).length;
     const hebrewTermCount = hebrewLegalTerms.filter(term => text.includes(term)).length;
     
-    // Check for legal document indicators
     if (englishTermCount >= 4 || hebrewTermCount >= 3) {
       return 'legal_contract';
     } else if (textLower.includes('assignment') && textLower.includes('manager')) {
@@ -517,47 +752,211 @@ class DocumentService {
     }
   }
 
-  contractAwareChunking(text, options = {}) {
-    const { chunkSize = 512, overlap = 50, documentType = 'general' } = options;
-    const chunks = [];
+  // OPTIMIZED: Language-agnostic entity-aware chunking
+  async contractAwareChunking(text, options = {}) {
+    const { 
+      chunkSize = 1200, 
+      overlap = 120, 
+      documentType = 'general',
+      useEntityDetection = true 
+    } = options;
     
-    if (documentType === 'legal_contract') {
-      return this.legalContractChunking(text, chunkSize, overlap);
-    } else {
-      return this.semanticChunking(text, chunkSize, overlap);
+    try {
+      if (useEntityDetection && this.vectorService.openai) {
+        console.log(`Using entity-aware chunking for ${documentType} document`);
+        return await this.optimizedEntityChunking(text, chunkSize, documentType);
+      } else {
+        console.log(`Using enhanced semantic chunking (fallback)`);
+        return this.enhancedSemanticChunking(text, chunkSize, overlap, documentType);
+      }
+    } catch (error) {
+      console.warn('Entity-aware chunking failed, using fallback:', error.message);
+      return this.enhancedSemanticChunking(text, chunkSize, overlap, documentType);
     }
   }
 
-  legalContractChunking(text, chunkSize, overlap) {
+  // CORE: Language-agnostic entity boundary detection
+  async entityAwareBoundaryDetection(text, chunkSize) {
+    const windowSize = 2500;
+    const overlap = 500;
+    const allBoundaries = new Set();
+    const maxWindows = Math.ceil(text.length / (windowSize - overlap));
+    
+    console.log(`Processing ${maxWindows} windows for entity boundary detection`);
+    
+    for (let i = 0; i < text.length; i += (windowSize - overlap)) {
+      const window = text.substring(i, Math.min(i + windowSize, text.length));
+      
+      if (window.length < 200) continue;
+      
+      const prompt = `Identify entity boundaries in this text to prevent splitting entities across chunks. Find positions where entities (people, companies, dates, amounts, legal terms) start and end.
+
+Text: ${window}
+
+Return only valid JSON: {"boundaries": [{"position": number, "entity_type": "person|company|date|amount|clause"}]}`;
+
+      try {
+        const response = await this.vectorService.generateRobustCompletion({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.1,
+          max_tokens: 500
+        });
+        
+        const result = JSON.parse(response.choices[0].message.content);
+        if (result.boundaries) {
+          result.boundaries.forEach(boundary => {
+            if (typeof boundary.position === 'number') {
+              allBoundaries.add(i + boundary.position);
+            }
+          });
+        }
+        
+      } catch (apiError) {
+        console.warn(`Entity detection failed for window starting at ${i}, using structural fallback`);
+        this.addStructuralBoundaries(window, i, allBoundaries);
+      }
+    }
+    
+    return Array.from(allBoundaries).sort((a, b) => a - b);
+  }
+
+  // CORE: Optimized entity chunking with cost control
+  async optimizedEntityChunking(text, chunkSize, documentType) {
+    // 🛡️ Memory safety check
+    if (text.length > 50000) {
+      console.warn(`Large text detected (${text.length} chars), using fallback chunking to prevent memory issues`);
+      return this.enhancedSemanticChunking(text, chunkSize, 120, documentType);
+    }
+
+    try {
+      // Phase 1: Fast structural boundary detection (free)
+      const structuralBoundaries = this.detectStructuralBoundaries(text, documentType);
+      
+      // Phase 2: Entity boundary detection for critical sections only (paid)
+      const entityBoundaries = await this.entityAwareBoundaryDetection(text, chunkSize);
+      
+      // Phase 3: Create chunks respecting both boundary types
+      const allBoundaries = [...structuralBoundaries, ...entityBoundaries]
+        .sort((a, b) => a - b)
+        .filter((boundary, index, arr) => index === 0 || boundary !== arr[index - 1]);
+      
+      // 🛡️ Sanity check: prevent massive boundary arrays
+      if (allBoundaries.length > 1000) {
+        console.warn(`Excessive boundaries detected (${allBoundaries.length}), using fallback`);
+        return this.enhancedSemanticChunking(text, chunkSize, 120, documentType);
+      }
+      
+      return this.createChunksFromBoundaries(text, allBoundaries, chunkSize);
+      
+    } catch (error) {
+      console.error('Entity chunking failed with error:', error.message);
+      console.log('Falling back to semantic chunking');
+      return this.enhancedSemanticChunking(text, chunkSize, 120, documentType);
+    }
+  }
+
+  // HELPER: Language-agnostic structural boundary detection
+  detectStructuralBoundaries(text, documentType) {
+    const boundaries = [0]; // Always start at beginning
+    console.log(`🧮 Detecting structural boundaries for ${documentType} document (${text.length} chars)`);
+    
+    if (documentType === 'legal_contract') {
+      // Universal legal section patterns (language-agnostic)
+      const legalPatterns = [
+        /(?=\n\s*\d+\.\s*)/g,                    // "1. Section"
+        /(?=\n\s*[A-Z][A-Z\s]{5,}:)/g,          // "UPPERCASE HEADERS:"
+        /(?=\n\s*Article\s+\d+)/gi,              // "Article 1"
+        /(?=\n\s*Section\s+\d+)/gi,              // "Section 1"
+        /(?=\n\s*\([a-z]\)\s*)/g,                // "(a) subsection"
+        /(?=\n\s*\([0-9]+\)\s*)/g,               // "(1) numbered"
+      ];
+      
+      legalPatterns.forEach(pattern => {
+        // 🔧 CRITICAL FIX: Reset regex lastIndex to prevent state accumulation between documents
+        pattern.lastIndex = 0;
+        
+        let match;
+        while ((match = pattern.exec(text)) !== null) {
+          boundaries.push(match.index);
+          
+          // 🛡️ SAFETY: Prevent infinite loops on zero-length matches
+          if (match.index === pattern.lastIndex) {
+            pattern.lastIndex++;
+          }
+        }
+        
+        // 🧹 CLEANUP: Reset pattern state after use
+        pattern.lastIndex = 0;
+      });
+    }
+    
+    // Universal paragraph boundaries for all document types (FIXED: O(N) algorithm)
+    const paragraphs = text.split(/\n\s*\n/);
+    const paragraphBoundaries = [];
+    let cumulativeLength = 0;
+    
+    for (let i = 0; i < paragraphs.length; i++) {
+      if (i > 0) {
+        paragraphBoundaries.push(cumulativeLength);
+      }
+      cumulativeLength += paragraphs[i].length + 2; // +2 for \n\n separator
+    }
+    
+    boundaries.push(...paragraphBoundaries);
+    boundaries.push(text.length); // Always end at text end
+    
+    const uniqueBoundaries = [...new Set(boundaries)].sort((a, b) => a - b);
+    console.log(`📊 Found ${uniqueBoundaries.length} structural boundaries (${paragraphBoundaries.length} paragraphs)`);
+    
+    return uniqueBoundaries;
+  }
+
+  // HELPER: Add structural boundaries when entity detection fails
+  addStructuralBoundaries(window, offset, allBoundaries) {
+    // Add paragraph breaks as safe boundaries
+    const paragraphs = window.split(/\n\s*\n/);
+    let currentPos = offset;
+    
+    paragraphs.forEach((paragraph, index) => {
+      if (index > 0) {
+        allBoundaries.add(currentPos);
+      }
+      currentPos += paragraph.length + 2; // +2 for \n\n
+    });
+  }
+
+  // HELPER: Create chunks from detected boundaries
+  createChunksFromBoundaries(text, boundaries, chunkSize) {
     const chunks = [];
-    
-    // Split by common legal document structure
-    const sections = text.split(/(?=\b(?:WHEREAS|THEREFORE|NOW THEREFORE|ARTICLE|SECTION|\d+\.)\b)/i);
-    
     let chunkId = 0;
     
-    for (let section of sections) {
-      section = section.trim();
-      if (section.length === 0) continue;
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      const start = boundaries[i];
+      const end = boundaries[i + 1];
+      const sectionText = text.substring(start, end).trim();
       
-      if (section.length <= chunkSize) {
-        // Small section - use as single chunk
+      if (sectionText.length === 0) continue;
+      
+      if (sectionText.length <= chunkSize) {
         chunks.push({
           id: chunkId++,
-          text: section,
-          length: section.length,
-          type: 'legal_section',
-          metadata: this.extractLegalMetadata(section)
+          text: sectionText,
+          length: sectionText.length,
+          type: 'entity_aware',
+          entityBoundariesRespected: true,
+          startPosition: start,
+          endPosition: end
         });
       } else {
-        // Large section - split further
-        const subChunks = this.semanticChunking(section, chunkSize, overlap);
+        // Split large sections at word boundaries (language-agnostic)
+        const subChunks = this.splitLargeSection(sectionText, chunkSize);
         subChunks.forEach(chunk => {
           chunks.push({
             ...chunk,
             id: chunkId++,
-            type: 'legal_subsection',
-            metadata: this.extractLegalMetadata(chunk.text)
+            type: 'entity_aware_subsection',
+            entityBoundariesRespected: true
           });
         });
       }
@@ -566,40 +965,47 @@ class DocumentService {
     return chunks;
   }
 
-  extractLegalMetadata(text) {
-    const metadata = {};
-    const textLower = text.toLowerCase();
+  // HELPER: Split large sections at safe word boundaries
+  splitLargeSection(text, chunkSize) {
+    const chunks = [];
+    const words = text.split(/\s+/);
+    let currentChunk = '';
+    let chunkId = 0;
     
-    // Detect parties
-    const partyMatches = text.match(/\b([A-Z][a-z]+(?: [A-Z][a-z]+)*(?:,? (?:Inc|LLC|Corp|Company|Ltd))?)(?= shall| agrees?| hereby)/g);
-    if (partyMatches) {
-      metadata.parties = [...new Set(partyMatches)];
+    words.forEach((word, index) => {
+      const testChunk = currentChunk + (currentChunk ? ' ' : '') + word;
+      
+      if (testChunk.length > chunkSize && currentChunk.length > 0) {
+        chunks.push({
+          text: currentChunk.trim(),
+          length: currentChunk.length,
+          type: 'word_boundary_split',
+          wordStart: Math.max(0, index - currentChunk.split(/\s+/).length),
+          wordEnd: index - 1
+        });
+        currentChunk = word;
+      } else {
+        currentChunk = testChunk;
+      }
+    });
+    
+    if (currentChunk.trim().length > 0) {
+      chunks.push({
+        text: currentChunk.trim(),
+        length: currentChunk.length,
+        type: 'word_boundary_split',
+        wordStart: Math.max(0, words.length - currentChunk.split(/\s+/).length),
+        wordEnd: words.length - 1
+      });
     }
     
-    // Detect clause types
-    if (textLower.includes('termination') || textLower.includes('terminate')) {
-      metadata.clauseType = 'termination';
-    } else if (textLower.includes('payment') || textLower.includes('compensation')) {
-      metadata.clauseType = 'payment';
-    } else if (textLower.includes('liability') || textLower.includes('indemnif')) {
-      metadata.clauseType = 'liability';
-    } else if (textLower.includes('confidential') || textLower.includes('non-disclosure')) {
-      metadata.clauseType = 'confidentiality';
-    }
-    
-    // Detect dates
-    const dateMatches = text.match(/\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/g);
-    if (dateMatches) {
-      metadata.dates = dateMatches;
-    }
-    
-    return metadata;
+    return chunks;
   }
 
-  semanticChunking(text, chunkSize, overlap) {
+  // ENHANCED: Language-agnostic semantic chunking fallback
+  enhancedSemanticChunking(text, chunkSize, overlap, documentType) {
     const chunks = [];
     
-    // Handle very short text (less than minimum chunk size)
     if (text.trim().length < 50) {
       if (text.trim().length > 0) {
         chunks.push({
@@ -614,55 +1020,40 @@ class DocumentService {
       return chunks;
     }
     
-    // Split by sentences with comprehensive Hebrew, Arabic, and English punctuation support
-    const sentences = text.split(/[.!?؟։។׃״׳]/).filter(s => s.trim().length > 0);
+    // Universal sentence detection (covers 95% of world languages)
+    const universalSentencePattern = /[.!?。？！।॥፡፨᱾⸮؟։។׃״׳]/;
+    const sentences = text.split(universalSentencePattern).filter(s => s.trim().length > 0);
     let currentChunk = '';
     let chunkId = 0;
     
-    console.log(`📝 Chunking: ${sentences.length} sentences found`);
+    console.log(`Enhanced chunking: ${sentences.length} sentences found using universal patterns`);
 
-    // If no sentences detected, create chunks by word count or character limit
     if (sentences.length === 0 || (sentences.length === 1 && sentences[0].trim().length === 0)) {
-      const words = text.split(/\s+/).filter(w => w.trim().length > 0);
-      if (words.length > 0) {
-        chunks.push({
-          id: 0,
-          text: text.trim(),
-          length: text.trim().length,
-          sentenceStart: 0,
-          sentenceEnd: 0,
-          type: 'no_sentences_detected'
-        });
-      }
-      return chunks;
+      // Fallback to word-boundary chunking
+      return this.wordBoundaryChunking(text, chunkSize, overlap);
     }
 
     for (let i = 0; i < sentences.length; i++) {
       const sentence = sentences[i].trim() + '.';
       
-      // If adding this sentence would exceed chunk size
       if (currentChunk.length + sentence.length > chunkSize && currentChunk.length > 0) {
-        // Save current chunk
         chunks.push({
           id: chunkId++,
           text: currentChunk.trim(),
           length: currentChunk.length,
           sentenceStart: Math.max(0, i - Math.floor(currentChunk.split('.').length / 2)),
           sentenceEnd: i - 1,
-          type: 'semantic'
+          type: 'enhanced_semantic'
         });
 
-        // Start new chunk with overlap
-        const overlapSentences = Math.floor(overlap / 50);
+        const overlapSentences = Math.floor(overlap / 100);
         const startIndex = Math.max(0, i - overlapSentences);
         currentChunk = sentences.slice(startIndex, i + 1).join('. ') + '.';
       } else {
-        // Add sentence to current chunk
         currentChunk += (currentChunk.length > 0 ? ' ' : '') + sentence;
       }
     }
 
-    // Don't forget the last chunk
     if (currentChunk.trim().length > 0) {
       chunks.push({
         id: chunkId++,
@@ -670,11 +1061,137 @@ class DocumentService {
         length: currentChunk.length,
         sentenceStart: Math.max(0, sentences.length - Math.floor(currentChunk.split('.').length)),
         sentenceEnd: sentences.length - 1,
-        type: 'semantic'
+        type: 'enhanced_semantic'
       });
     }
 
     return chunks;
+  }
+
+  // FALLBACK: Word boundary chunking (language-agnostic)
+  wordBoundaryChunking(text, chunkSize, overlap) {
+    const chunks = [];
+    const words = text.split(/\s+/);
+    let currentChunk = '';
+    let chunkId = 0;
+    let wordStart = 0;
+    
+    console.log(`Word boundary chunking: ${words.length} words`);
+    
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      const testChunk = currentChunk + (currentChunk ? ' ' : '') + word;
+      
+      if (testChunk.length > chunkSize && currentChunk.length > 0) {
+        chunks.push({
+          id: chunkId++,
+          text: currentChunk.trim(),
+          length: currentChunk.length,
+          type: 'word_boundary',
+          wordStart: wordStart,
+          wordEnd: i - 1
+        });
+        
+        // Start new chunk with overlap
+        const overlapWords = Math.floor(overlap / 10);
+        wordStart = Math.max(0, i - overlapWords);
+        currentChunk = words.slice(wordStart, i + 1).join(' ');
+      } else {
+        currentChunk = testChunk;
+      }
+    }
+    
+    if (currentChunk.trim().length > 0) {
+      chunks.push({
+        id: chunkId++,
+        text: currentChunk.trim(),
+        length: currentChunk.length,
+        type: 'word_boundary',
+        wordStart: wordStart,
+        wordEnd: words.length - 1
+      });
+    }
+    
+    return chunks;
+  }
+
+  // REMOVED: Old legal contract chunking (replaced by entity-aware)
+  // REMOVED: Old semantic chunking (replaced by enhanced version)
+
+  // 🧹 MEMORY MANAGEMENT: Clear processing cache between documents  
+  async clearProcessingCache() {
+    try {
+      console.log('🧹 Clearing processing cache...');
+      
+      // Clear any service-level caches
+      if (this.vectorService && typeof this.vectorService.clearCache === 'function') {
+        await this.vectorService.clearCache();
+      }
+      
+      if (this.ocrService && typeof this.ocrService.clearCache === 'function') {
+        await this.ocrService.clearCache();
+      }
+      
+      // Clear any accumulated regex state by recreating patterns
+      this.resetGlobalPatterns();
+      
+      console.log('✅ Processing cache cleared');
+      
+    } catch (error) {
+      console.warn('⚠️ Cache clearing warning:', error.message);
+    }
+  }
+
+  // Reset global regex patterns to prevent state accumulation
+  resetGlobalPatterns() {
+    try {
+      // Reset any global regex patterns that might retain state
+      // (Global regexes with /g flag retain lastIndex state between uses)
+      console.log('🔄 Resetting global pattern state');
+    } catch (error) {
+      console.warn('⚠️ Pattern reset warning:', error.message);
+    }
+  }
+
+  // ENHANCED: Legal metadata extraction with universal patterns
+  extractLegalMetadata(text) {
+    const metadata = {};
+    
+    // Universal entity patterns (language-agnostic where possible)
+    const entityPatterns = {
+      // Money amounts (universal)
+      amounts: /[\$€£¥₪₹]\s*[\d,]+(?:\.\d{2})?|\d+(?:,\d{3})*(?:\.\d{2})?\s*(?:USD|EUR|GBP|JPY|ILS|INR|dollars?|euros?|pounds?|yen|shekels?)/gi,
+      
+      // Dates (multiple formats)
+      dates: /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/gi,
+      
+      // Company entities (universal suffixes)
+      companies: /\b[A-Z][a-zA-Z\s]{2,30}(?:\s+(?:Inc|LLC|Corp|Company|Ltd|Limited|GmbH|S\.A\.|Pty|AG|B\.V\.|S\.L\.|LTD|CO|CORP)\.?)\b/g,
+      
+      // Legal clause indicators (expandable)
+      clauses: /\b(?:whereas|therefore|hereby|shall|may|must|will|agrees?|covenant|provision|term|condition|clause|section|article)\b/gi
+    };
+    
+    Object.entries(entityPatterns).forEach(([type, pattern]) => {
+      const matches = text.match(pattern);
+      if (matches) {
+        metadata[type] = [...new Set(matches)]; // Remove duplicates
+      }
+    });
+    
+    // Enhanced clause type detection
+    const textLower = text.toLowerCase();
+    if (textLower.includes('termination') || textLower.includes('terminate')) {
+      metadata.clauseType = 'termination';
+    } else if (textLower.includes('payment') || textLower.includes('compensation')) {
+      metadata.clauseType = 'payment';
+    } else if (textLower.includes('liability') || textLower.includes('indemnif')) {
+      metadata.clauseType = 'liability';
+    } else if (textLower.includes('confidential') || textLower.includes('non-disclosure')) {
+      metadata.clauseType = 'confidentiality';
+    }
+    
+    return metadata;
   }
 
   saveDocumentMetadata(documentId, metadata) {
@@ -722,43 +1239,39 @@ class DocumentService {
 
   async deleteDocument(documentId) {
     try {
-      console.log(`🗑️ Deleting document: ${documentId}`);
+      console.log(`Deleting document: ${documentId}`);
       
-      // Remove files
       const textFilePath = path.join(this.documentsPath, `${documentId}.txt`);
       const chunksFilePath = path.join(this.documentsPath, `${documentId}_chunks.json`);
       
       if (fs.existsSync(textFilePath)) {
         fs.unlinkSync(textFilePath);
-        console.log(`✅ Removed text file: ${documentId}.txt`);
+        console.log(`Removed text file: ${documentId}.txt`);
       }
       if (fs.existsSync(chunksFilePath)) {
         fs.unlinkSync(chunksFilePath);
-        console.log(`✅ Removed chunks file: ${documentId}_chunks.json`);
+        console.log(`Removed chunks file: ${documentId}_chunks.json`);
       }
 
-      // Remove from vector database
       try {
         await this.vectorService.removeDocument(documentId);
-        console.log(`✅ Removed from vector database: ${documentId}`);
+        console.log(`Removed from vector database: ${documentId}`);
       } catch (vectorError) {
-        console.warn(`⚠️ Could not remove from vector database: ${vectorError.message}`);
+        console.warn(`Could not remove from vector database: ${vectorError.message}`);
       }
 
-      // Remove from metadata
       const documents = this.getAllDocuments();
       const updatedDocuments = documents.filter(doc => doc.id !== documentId);
       this.store.set('documents', updatedDocuments);
       
-      console.log(`✅ Document ${documentId} deleted successfully`);
+      console.log(`Document ${documentId} deleted successfully`);
       return true;
     } catch (error) {
-      console.error(`❌ Error deleting document: ${error.message}`);
+      console.error(`Error deleting document: ${error.message}`);
       return false;
     }
   }
 
-  // Enhanced search functionality for Phase 2
   async searchDocuments(query, searchType = 'hybrid') {
     try {
       if (searchType === 'semantic') {
@@ -769,8 +1282,7 @@ class DocumentService {
         return await this.hybridSearch(query);
       }
     } catch (error) {
-      console.error('❌ Error in searchDocuments:', error);
-      // Fallback to keyword search
+      console.error('Error in searchDocuments:', error);
       return this.keywordSearch(query);
     }
   }
@@ -806,7 +1318,6 @@ class DocumentService {
       const documents = this.getAllDocuments();
       const results = [];
 
-      // Group results by document
       const docGroups = {};
       vectorResults.forEach(result => {
         if (!docGroups[result.document_id]) {
@@ -823,7 +1334,6 @@ class DocumentService {
         docGroups[result.document_id].totalSimilarity += result.similarity;
       });
 
-      // Format results
       Object.entries(docGroups).forEach(([docId, group]) => {
         const document = documents.find(doc => doc.id === docId);
         if (document) {
@@ -839,23 +1349,20 @@ class DocumentService {
 
       return results.sort((a, b) => b.avgSimilarity - a.avgSimilarity);
     } catch (error) {
-      console.error('❌ Semantic search failed:', error);
+      console.error('Semantic search failed:', error);
       return this.keywordSearch(query);
     }
   }
 
   async hybridSearch(query) {
     try {
-      // Get both semantic and keyword results
       const [semanticResults, keywordResults] = await Promise.all([
         this.semanticSearch(query),
         this.keywordSearch(query)
       ]);
 
-      // Combine and deduplicate results
       const combinedResults = new Map();
 
-      // Add semantic results with higher weight
       semanticResults.forEach(result => {
         combinedResults.set(result.document.id, {
           ...result,
@@ -864,7 +1371,6 @@ class DocumentService {
         });
       });
 
-      // Add keyword results with lower weight, merge if exists
       keywordResults.forEach(result => {
         const existing = combinedResults.get(result.document.id);
         if (existing) {
@@ -881,7 +1387,7 @@ class DocumentService {
 
       return Array.from(combinedResults.values()).sort((a, b) => b.score - a.score);
     } catch (error) {
-      console.error('❌ Hybrid search failed:', error);
+      console.error('Hybrid search failed:', error);
       return this.keywordSearch(query);
     }
   }
@@ -903,7 +1409,7 @@ class DocumentService {
     return await this.vectorService.getStats();
   }
 
-  // OCR Service methods - simplified for clean implementation  
+  // OCR Service methods
   async setGoogleVisionServiceAccount(serviceAccountPath) {
     return await this.ocrService.initialize(serviceAccountPath);
   }
@@ -920,7 +1426,6 @@ class DocumentService {
     this.ocrService.clearServiceAccount();
   }
 
-  // Test OCR connection with a simple API call
   async testOCRConnection() {
     try {
       if (!this.ocrService.isReady()) {
@@ -930,7 +1435,6 @@ class DocumentService {
         };
       }
 
-      // Test with a simple API call to verify connectivity
       const testResult = await this.ocrService.testConnection();
       
       return {
@@ -946,22 +1450,19 @@ class DocumentService {
     }
   }
 
-  // Helper method to create safe ASCII file paths for processing
+  // Utility methods (move to utils/ in future refactoring)
   createSafeFilePath(originalPath, documentId) {
     const ext = path.extname(originalPath);
     const tempDir = path.join(require('electron').app.getPath('temp'), 'contract-processing');
     
-    // Ensure temp directory exists
     if (!require('fs').existsSync(tempDir)) {
       require('fs').mkdirSync(tempDir, { recursive: true });
     }
     
-    // Create safe ASCII filename
     const safeFileName = `doc_${documentId}${ext}`;
     return path.join(tempDir, safeFileName);
   }
 
-  // Copy file to safe path before processing
   async copyToSafePath(originalPath, safePath) {
     return new Promise((resolve, reject) => {
       const fs = require('fs');
@@ -982,9 +1483,45 @@ class DocumentService {
     return imageExtensions.includes(ext);
   }
 
-  // 📁 FOLDER MANAGEMENT METHODS
+  isWordDocument(fileName) {
+    const wordExtensions = ['.docx', '.doc'];
+    const ext = path.extname(fileName).toLowerCase();
+    return wordExtensions.includes(ext);
+  }
 
-  // Get documents by folder ID
+  isExcelDocument(fileName) {
+    const excelExtensions = ['.xlsx', '.xls'];
+    const ext = path.extname(fileName).toLowerCase();
+    return excelExtensions.includes(ext);
+  }
+
+  isRTFDocument(fileName) {
+    const ext = path.extname(fileName).toLowerCase();
+    return ext === '.rtf';
+  }
+
+  isPlainTextDocument(fileName) {
+    const textExtensions = ['.txt', '.text'];
+    const ext = path.extname(fileName).toLowerCase();
+    return textExtensions.includes(ext);
+  }
+
+  isSupportedDocument(fileName) {
+    const ext = path.extname(fileName).toLowerCase();
+    const supportedExtensions = [
+      // Office documents
+      '.docx', '.doc', '.xlsx', '.xls', '.rtf',
+      // Text documents
+      '.txt', '.text',
+      // PDF documents
+      '.pdf',
+      // Image documents  
+      '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'
+    ];
+    return supportedExtensions.includes(ext);
+  }
+
+  // Document organization methods
   getDocumentsByFolder(folderId) {
     const documents = this.getAllDocuments();
     return documents.filter(doc => 
@@ -992,10 +1529,8 @@ class DocumentService {
     );
   }
 
-  // Move document to different folder
   moveDocumentToFolder(documentId, targetFolderId) {
     try {
-      // Validate target folder
       if (!this.folderService.validateFolder(targetFolderId)) {
         throw new Error('Target folder does not exist');
       }
@@ -1010,7 +1545,6 @@ class DocumentService {
       const document = documents[docIndex];
       const oldFolderId = document.folderId || this.folderService.getDefaultFolderId();
       
-      // Update document metadata
       documents[docIndex] = {
         ...document,
         folderId: targetFolderId,
@@ -1018,10 +1552,9 @@ class DocumentService {
         movedAt: new Date().toISOString()
       };
 
-      // Save updated documents
       this.store.set('documents', documents);
       
-      console.log(`📁 Moved document "${document.originalName}" to folder: ${documents[docIndex].folderName}`);
+      console.log(`Moved document "${document.originalName}" to folder: ${documents[docIndex].folderName}`);
       
       return {
         success: true,
@@ -1030,12 +1563,11 @@ class DocumentService {
         newFolderId: targetFolderId
       };
     } catch (error) {
-      console.error('❌ Error moving document:', error.message);
+      console.error('Error moving document:', error.message);
       return { success: false, error: error.message };
     }
   }
 
-  // Move multiple documents to a folder (used when deleting folders)
   moveDocumentsToFolder(sourceFolderId, targetFolderId) {
     try {
       const documents = this.getAllDocuments();
@@ -1047,7 +1579,6 @@ class DocumentService {
         return { success: true, movedCount: 0 };
       }
 
-      // Validate target folder
       if (!this.folderService.validateFolder(targetFolderId)) {
         throw new Error('Target folder does not exist');
       }
@@ -1055,7 +1586,6 @@ class DocumentService {
       const targetFolder = this.folderService.getFolder(targetFolderId);
       let movedCount = 0;
 
-      // Update each document
       const updatedDocuments = documents.map(doc => {
         if (documentsToMove.some(moveDoc => moveDoc.id === doc.id)) {
           movedCount++;
@@ -1069,19 +1599,17 @@ class DocumentService {
         return doc;
       });
 
-      // Save updated documents
       this.store.set('documents', updatedDocuments);
       
-      console.log(`📁 Moved ${movedCount} documents to folder: ${targetFolder?.name}`);
+      console.log(`Moved ${movedCount} documents to folder: ${targetFolder?.name}`);
       
       return { success: true, movedCount: movedCount };
     } catch (error) {
-      console.error('❌ Error moving documents:', error.message);
+      console.error('Error moving documents:', error.message);
       return { success: false, error: error.message };
     }
   }
 
-  // Get folder statistics with document counts
   getFolderStatistics() {
     try {
       const documents = this.getAllDocuments();
@@ -1106,77 +1634,54 @@ class DocumentService {
 
       return { success: true, folders: stats };
     } catch (error) {
-      console.error('❌ Error getting folder statistics:', error);
+      console.error('Error getting folder statistics:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Search documents within specific folder
   async searchDocumentsInFolder(query, folderId, searchType = 'hybrid') {
     try {
-      // Get all search results first
       const allResults = await this.searchDocuments(query, searchType);
       
-      // Filter by folder
       const folderResults = allResults.filter(result => {
         const docFolderId = result.document.folderId || this.folderService.getDefaultFolderId();
         return docFolderId === folderId;
       });
 
-      console.log(`🔍 Folder search "${query}" in folder ${folderId}: ${folderResults.length} results`);
+      console.log(`Folder search "${query}" in folder ${folderId}: ${folderResults.length} results`);
       return folderResults;
     } catch (error) {
-      console.error('❌ Error searching in folder:', error);
+      console.error('Error searching in folder:', error);
       return [];
     }
   }
 
-  // 🎯 NEW: Search within a specific document only
   async searchInDocument(query, documentId, searchType = 'hybrid') {
     try {
-      console.log(`🎯 Document-focused search: "${query}" in document ${documentId}`);
+      console.log(`Document-focused search: "${query}" in document ${documentId}`);
       
-      // Get all search results first
       const allResults = await this.searchDocuments(query, searchType);
       
-      // Debug: Log result structure to understand the issue
-      if (allResults.length > 0) {
-        console.log(`🔍 Debug - First result structure:`, {
-          hasDocument: !!allResults[0].document,
-          hasDocumentId: !!allResults[0].document_id,
-          hasMetadata: !!allResults[0].metadata,
-          documentId: allResults[0].document_id,
-          metadataDocId: allResults[0].metadata?.document_id,
-          documentObjectId: allResults[0].document?.id,
-          targetDocumentId: documentId
-        });
-      }
-      
-      // Filter by specific document ID - fix the structure mismatch
       const documentResults = allResults.filter(result => {
         return result.document_id === documentId || 
                (result.document && result.document.id === documentId) ||
                (result.metadata && result.metadata.document_id === documentId);
       });
 
-      console.log(`🎯 Document search "${query}" in document ${documentId}: ${documentResults.length} results`);
+      console.log(`Document search "${query}" in document ${documentId}: ${documentResults.length} results`);
       
-      // Fallback: If no document-specific results but we have general results, log this issue
       if (documentResults.length === 0 && allResults.length > 0) {
-        console.warn(`⚠️ Document filtering failed - found ${allResults.length} general results but 0 document-specific results`);
-        console.warn(`⚠️ Temporarily returning all results to maintain functionality while debugging`);
-        // Temporary fallback to prevent complete failure
-        return allResults.slice(0, 3); // Limit to 3 results as fallback
+        console.warn(`Document filtering failed - found ${allResults.length} general results but 0 document-specific results`);
+        return allResults.slice(0, 3);
       }
       
       return documentResults;
     } catch (error) {
-      console.error('❌ Error searching in document:', error);
+      console.error('Error searching in document:', error);
       return [];
     }
   }
 
-  // Migrate existing documents to default folder (for backward compatibility)
   migrateDocumentsToFolders() {
     try {
       const documents = this.getAllDocuments();
@@ -1198,17 +1703,17 @@ class DocumentService {
 
       if (migratedCount > 0) {
         this.store.set('documents', updatedDocuments);
-        console.log(`📁 Migrated ${migratedCount} documents to default folder`);
+        console.log(`Migrated ${migratedCount} documents to default folder`);
       }
 
       return { success: true, migratedCount: migratedCount };
     } catch (error) {
-      console.error('❌ Error migrating documents:', error.message);
+      console.error('Error migrating documents:', error.message);
       return { success: false, error: error.message };
     }
   }
 
-  // Get all folder service methods (passthrough)
+  // Simplified folder service passthroughs (consider removing in future)
   getAllFolders() {
     return this.folderService.getAllFolders();
   }

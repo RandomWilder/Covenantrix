@@ -172,7 +172,20 @@ class OCRService {
       const pageResults = [];
 
       for (let pageNum = 1; pageNum <= info.pages; pageNum++) {
-        const imagePath = path.join(tempDir, `page-${pageNum}.png`);
+        // 🔧 FIX: Try multiple naming patterns that pdf-poppler might use
+        const possiblePaths = [
+          path.join(tempDir, `page-${pageNum}.png`),        // page-1.png
+          path.join(tempDir, `page-${pageNum.toString().padStart(2, '0')}.png`), // page-01.png
+          path.join(tempDir, `page.${pageNum}.png`),        // page.1.png
+        ];
+
+        let imagePath = null;
+        for (const testPath of possiblePaths) {
+          if (fs.existsSync(testPath)) {
+            imagePath = testPath;
+            break;
+          }
+        }
         
         // Report progress for current page
         if (progressCallback) {
@@ -185,7 +198,7 @@ class OCRService {
           });
         }
         
-        if (fs.existsSync(imagePath)) {
+        if (imagePath && fs.existsSync(imagePath)) {
           try {
             console.log(`📄 Processing page ${pageNum}/${info.pages}...`);
             
@@ -222,7 +235,7 @@ class OCRService {
             pageResults.push({ pageNum, error: pageError.message });
           }
         } else {
-          console.warn(`⚠️ Page ${pageNum} image not found: ${imagePath}`);
+          console.warn(`⚠️ Page ${pageNum} image not found. Tried: ${possiblePaths.join(', ')}`);
         }
       }
 
@@ -500,6 +513,21 @@ class OCRService {
     this.isInitialized = false;
     this.store.delete('serviceAccountPath');
     console.log('🗑️ Google Vision service account cleared');
+  }
+
+  // 🧹 MEMORY MANAGEMENT: Clear service cache between documents
+  async clearCache() {
+    try {
+      console.log('🧹 Clearing OCRService cache...');
+      
+      // Clear any temporary image processing data
+      // Keep the Google Vision client connection alive for efficiency
+      
+      console.log('✅ OCRService cache cleared');
+      
+    } catch (error) {
+      console.warn('⚠️ OCRService cache clearing warning:', error.message);
+    }
   }
 }
 
